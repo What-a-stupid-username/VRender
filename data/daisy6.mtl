@@ -1,0 +1,38 @@
+newmtl initialShadingGroup
+illum 4
+Kd 0.50 0.50 0.50
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl mtl_blossom_center
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd bud-yellow-1.tga
+Ni 1.00
+Ks 0.50 0.50 0.50
+newmtl mtl_daisy_blossom
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd blossom_white1.png
+Ni 1.00
+Ks 0.50 0.50 0.50
+newmtl mtl_daisy_leaves
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd daisy_green_diffuse.png
+Ni 1.00
+Ks 0.50 0.50 0.50
+newmtl pasted__mtl_grass2
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd grass2_diffuse.png
+Ni 1.00
+Ks 0.50 0.50 0.50

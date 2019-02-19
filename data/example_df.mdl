@@ -1,0 +1,86 @@
+/******************************************************************************
+ * Copyright 2018 NVIDIA Corporation. All rights reserved.
+ ******************************************************************************/
+
+mdl 1.4;
+
+import tex::*;
+import df::*;
+import math::*;
+import state::*;
+import anno::*;
+
+struct checker_value {
+    float2 roughness;
+    float weight;
+};
+
+checker_value checker(float2 uv, float roughness, float anisotropy )
+{
+    checker_value val;
+    bool x =  (int(uv.x) & 1) != 0;
+    bool y =  (int(uv.y) & 1) != 0;
+
+    if (x != y)  {
+        float iso = (1.0f - anisotropy);
+        val.roughness = x ? float2(roughness * iso, roughness / iso) : float2(roughness / iso, roughness * iso);
+        val.weight = 1.0f;
+    }
+    return val;
+}
+
+// a material combining a diffuse, glossy, and specular
+export material df_material(
+    float tex_coord_scale = 15.0f,
+    float checker_scale = 1.0f,
+    color glossy_tint = color(0.3f, 0.5f, 1.0f),
+    float glossy_weight = 1.0f
+    [[
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+    color diffuse_tint = color(1.0f, 0.5f, 0.3f),
+    float diffuse_weight = 0.25f
+    [[
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+    float clearcoat_ior = 1.5f
+    [[
+        anno::hard_range(1.0f, 10.0f)
+    ]],
+    float roughness = 0.1f
+    [[
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+    float anisotropy = 0.5f
+    [[
+        anno::hard_range(0.0f, 1.0f)
+    ]]
+)
+= let {
+    float3 tex_coord3 = state::texture_coordinate(0);
+    float2 tex_coord = float2(tex_coord3.x, tex_coord3.y) * tex_coord_scale;
+    float4 tex_value = tex::lookup_float4(texture_2d("nvidia_logo.png"), tex_coord);
+
+    checker_value cval = checker(tex_coord * checker_scale, roughness, anisotropy);
+}
+in material(
+    surface: material_surface(
+        scattering: df::fresnel_layer(
+            ior: clearcoat_ior,
+            layer: df::specular_bsdf(),
+            base: df::normalized_mix(
+                df::bsdf_component[2](
+                    df::bsdf_component(
+                        weight: diffuse_weight,
+                        component: df::diffuse_reflection_bsdf(
+                            tint: color(tex_value.x, tex_value.y, tex_value.z) * diffuse_tint)),
+                    df::bsdf_component(
+                        weight: glossy_weight * cval.weight,
+                        component: df::simple_glossy_bsdf(
+                            roughness_u: cval.roughness.x, roughness_v: cval.roughness.y, tint: glossy_tint))
+                    )
+                )
+            )
+        )
+);
+

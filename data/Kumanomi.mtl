@@ -1,0 +1,20 @@
+####
+#
+# Model and texture copyright Toru Miyazawa, Toucan Corporation. Used by permission.
+# http://toucan.web.infoseek.co.jp/3DCG/3ds/FishModelsE.html
+#
+####
+#
+# Wavefront material file
+# Converted by Meshlab Group
+#
+
+newmtl material_0
+Ka 0.200000 0.200000 0.200000
+Kd 1.000000 1.000000 1.000000
+Ks 1.000000 1.000000 1.000000
+d 1.000000
+illum 2
+Ns 0.000000
+map_Kd KumanoT.ppm
+
