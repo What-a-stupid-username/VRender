@@ -2,12 +2,17 @@
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <iostream>
+#include <thrust/functional.h>
+
+typedef float t_t;
+
 
 //typedef float T;
 template<typename T>
 class CUDABuffer {
 	T* ptr;
 	size_t size;
+	CUDABuffer(CUDABuffer& c) {}
 public:
 	CUDABuffer(size_t size) {
 		cudaMalloc((void**)&ptr, size * sizeof(T));
@@ -27,14 +32,14 @@ public:
 	}
 };
 
-__global__ void SetID(int* ids, int n) {
-	int index = blockDim.x * blockIdx.x + threadIdx.x;
+__global__ void SetV(t_t* data, int n) {
+	int index = blockDim.x * threadIdx.y + threadIdx.x;
 	if (index < n) {
-		ids[index] = index+1;
+		data[index] = 197 * index % 17 + 1;
 	}
 }
 
-void SetID(CUDABuffer<int> buffer) {
+void SetV(CUDABuffer<t_t>& buffer) {
 	cudaDeviceProp myCUDA;
 	if (cudaGetDeviceProperties(&myCUDA, 0) != cudaSuccess) {
 		std::cout << "error";
@@ -48,7 +53,7 @@ void SetID(CUDABuffer<int> buffer) {
 	else {
 		blocksPerGrid += bufferSize % threadsPerBlock ? 1 : 0;
 	}
-	SetID<<<blocksPerGrid, threadsPerBlock>>>(buffer.Value(), bufferSize);
+	SetV<<<blocksPerGrid, threadsPerBlock>>>(buffer.Value(), bufferSize);
 }
 
 void BuildKdTree(CUDABuffer<float> buffer) {
@@ -60,28 +65,38 @@ int main(void)
 {
 	int sss = 0;
 	std::cin >> sss;
-	CUDABuffer<int> buffer(sss);
-	SetID(buffer);
+	CUDABuffer<t_t> buffer(sss);
+	t_t* res = new t_t[sss];
+	for (int i = 0; i < sss; i++)
+	{
+		res[i] = i+1;
+	}
+	cudaMemcpy(buffer.Value(), res, sss * sizeof(t_t), cudaMemcpyKind::cudaMemcpyHostToDevice);
+	for (int i = 0; i < sss; i++)
+	{
+		res[i] = 0;
+	}
+
+	SetV(buffer);
+
 	if (cudaDeviceSynchronize()) {
 		std::cout << "!*!*!**!*!*";
 	}
-	SetID(buffer);
-	if (cudaDeviceSynchronize()) {
-		std::cout << "!*!*!**!*!*";
+	cudaMemcpy(res, buffer.Value(), sss * sizeof(t_t), cudaMemcpyKind::cudaMemcpyDeviceToHost);
+	for (int i = 0; i < sss; i++)
+	{
+		std::cout << res[i] << std::endl;
 	}
-	//thrust::device_ptr<int> buffer_ptr(buffer.Value());
 
-	//thrust::device_vector<int> k = thrust::device_vector<int>(buffer_ptr, buffer_ptr+sss);
-	//
+	thrust::device_ptr<t_t> buffer_ptr(buffer.Value());
+	
+	thrust::sort(buffer_ptr, buffer_ptr + sss);
 
-	//// H has storage for 4 integers
-	//thrust::host_vector <int> H = k;
-
-	//for each (auto i in H)
-	//{
-	//	std::cout << i << std::endl;
-	//}
-
+	cudaMemcpy(res, buffer.Value(), sss * sizeof(t_t), cudaMemcpyKind::cudaMemcpyDeviceToHost);
+	for (int i = 0; i < sss; i++)
+	{
+		std::cout << res[i] << std::endl;
+	}
 
 	system("PAUSE");
 	return 0;
