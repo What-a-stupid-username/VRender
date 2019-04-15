@@ -30,6 +30,8 @@
 #include "optixPathTracer.h"
 #include "random.h"
 
+#include "PBS.h"
+
 using namespace optix;
 
 struct PerRayData_pathtrace
@@ -136,13 +138,13 @@ RT_PROGRAM void pathtrace_camera()
 
 //-----------------------------------------------------------------------------
 //
-//  Emissive surface closest-hit
+//  default_light closest-hit
 //
 //-----------------------------------------------------------------------------
 
 rtDeclareVariable(float3,        emission_color, , );
 
-RT_PROGRAM void diffuseEmitter()
+RT_PROGRAM void default_light_closest_hit() //ray-type = 0(normal_ray)
 {
     current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
 }
@@ -150,79 +152,113 @@ RT_PROGRAM void diffuseEmitter()
 
 //-----------------------------------------------------------------------------
 //
-//  Lambertian surface closest-hit
+//  default_lit_ closest-hit
 //
 //-----------------------------------------------------------------------------
 
-rtDeclareVariable(float3,	  diffuse_color, , );
-rtDeclareVariable(float,	  trans, , ) = 0;
-rtDeclareVariable(float,	  spec, , ) = 0;
-rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
-rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
-rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
-rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
+rtDeclareVariable(float3,		albedo, , );
+rtDeclareVariable(float,		transparent, , ) = 0.f;
+rtDeclareVariable(float,		metallic, , ) = 0.f;
+rtDeclareVariable(float,		smoothness, , ) = 0.5f;
+rtDeclareVariable(float,		refraction_index, , ) = 1.5f;
 
 
-RT_PROGRAM void diffuse()
+rtDeclareVariable(float3,		geometric_normal,	attribute geometric_normal, );
+rtDeclareVariable(float3,		shading_normal,		attribute shading_normal, );
+rtDeclareVariable(float3,		texcoord,			attribute texcoord, );
+rtDeclareVariable(optix::Ray,	ray,				rtCurrentRay, );
+rtDeclareVariable(float,		t_hit,				rtIntersectionDistance, );
+
+RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 {
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
 
-    float3 hitpoint = ray.origin + t_hit * ray.direction;
+	float3 hitpoint = ray.origin + t_hit * ray.direction;
 
-    float z1=rnd(current_prd.seed);
 	current_prd.seed += 197;
-    float z2=rnd(current_prd.seed);
+	float z1 = rnd(current_prd.seed);
+	current_prd.seed += 197;
+	float z2 = rnd(current_prd.seed);
 
+	// initialize surface info
+	SurfaceInfo IN;
+	IN.baseColor = albedo;
+	IN.transparent = transparent;
+	IN.metallic = metallic;
+	IN.smoothness = smoothness;
+	IN.normal = ffnormal;
+
+	current_prd.radiance = make_float3(0);
 	{
+		int in_to_out = dot(ray.direction, world_geometric_normal) > 0;
+
 		float3 p;
 		PerRayData_pathtrace prd;
 		Ray next_ray;
 		prd.depth = current_prd.depth + 1;
 		prd.seed = current_prd.seed;
 		prd.radiance = make_float3(0);
-		if (current_prd.depth < 3) {
-			float max_diffuse = max(max(diffuse_color.x, diffuse_color.y), diffuse_color.z);
-			if (z1 < max_diffuse * (1 - trans))
+
+		float3 a;
+		float b;
+		float3 baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
+
+		if (current_prd.depth < 6) 
+		{
 			{
-				cosine_sample_hemisphere(z1, z2, p);
-				optix::Onb onb(ffnormal);
-				onb.inverse_transform(p);
+				float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
+				if (z1 < max_diffuse * transparent) //透射部分
+				{
+					if (refract(p, ray.direction, ffnormal, in_to_out ? 1.0f / refraction_index : refraction_index)) {
+						prd.countEmitted = false;
 
-				prd.countEmitted = false;
+						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
-				next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+						rtTrace(top_object, next_ray, prd);
 
-				rtTrace(top_object, next_ray, prd);
-				current_prd.radiance += prd.radiance * diffuse_color / max_diffuse * (1 - spec);
+						current_prd.radiance += prd.radiance * baseColor / max_diffuse;
+					}
+				}
+				if (!in_to_out) {
+					if (z2 < max_diffuse * (1 - transparent)) { //漫射部分
+						cosine_sample_hemisphere(z1, z2, p);
+						optix::Onb onb(ffnormal);
+						onb.inverse_transform(p);
+
+						prd.countEmitted = false;
+
+						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+
+						rtTrace(top_object, next_ray, prd);
+						current_prd.radiance += prd.radiance * baseColor / max_diffuse * M_1_PI;
+					}
+				}
 			}
-			if (z1 < max(spec, 0.04)) {
-				p = reflect(ray.direction, ffnormal);
+			if (z1 < 1.f / (current_prd.depth + 4))
+			{// 反射部分
+				float pd = M_PI;
+				float3 n;
+				uniform_sample_hemisphere(z1, z2, n);
+				//sample_GGX(make_float2(z1, z2), IN.smoothness, n, pd);
+				if (pd != 0) {
+					optix::Onb onb(ffnormal);
+					onb.inverse_transform(n);
+					p = reflect(ray.direction, n);
 
-				prd.countEmitted = true;
+					prd.countEmitted = false;
 
-				next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
-				rtTrace(top_object, next_ray, prd);
-				current_prd.radiance += prd.radiance;
-			}
-		}
-		if (z1 < trans) {
-			if (current_prd.depth < 9) {
-				refract(p, ray.direction, ffnormal, 1.5);
+					rtTrace(top_object, next_ray, prd);
 
-				prd.countEmitted = true;
-
-				next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
-
-				rtTrace(top_object, next_ray, prd);
-				current_prd.radiance += prd.radiance * 1;
+					current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth + 4) / pd;
+				}
 			}
 		}
 	}
 	
-
 
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
@@ -252,12 +288,12 @@ RT_PROGRAM void diffuse()
 			{
 				const float A = length(cross(light.v1, light.v2));
 				// convert area based pdf to solid angle
-				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				result += light.emission * weight * shadow_prd.inShadow;
+				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
+				result += PBS(IN, L, light.emission * weight * shadow_prd.inShadow, -ray.direction);
 			}
 		}
 	}
-	current_prd.radiance += result * diffuse_color;
+	current_prd.radiance += result * albedo;
 }
 
 
@@ -269,14 +305,14 @@ RT_PROGRAM void diffuse()
 
 rtDeclareVariable(PerRayData_pathtrace_shadow, current_prd_shadow, rtPayload, );
 
-RT_PROGRAM void shadow()
+RT_PROGRAM void default_lit_any_hit() //ray-type = 1(shadow_ray)
 {
-	if (trans == 0) {
+	if (transparent == 0) {
 		current_prd_shadow.inShadow = 0;
 		rtTerminateRay();
 	}
 	else {
-		current_prd_shadow.inShadow *= trans * 0.8;
+		current_prd_shadow.inShadow *= transparent * 0.8;
 		rtIgnoreIntersection();
 	}
 }

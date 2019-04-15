@@ -3,7 +3,8 @@ add_definitions(-DGLUT_FOUND -DGLUT_NO_LIB_PRAGMA)
 
 add_sample_executable(Renderer 
     main.cpp
-    optixPathTracer.cu
+    path_tracer.cu
+    photon_map.cu
     optixPathTracer.h
 	
 	CommonInclude.h

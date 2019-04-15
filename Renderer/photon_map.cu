@@ -4,7 +4,7 @@
 
 using namespace optix;
 
-#define DEBUG_
+#define DEBUG
 #ifdef DEBUG
 
 
@@ -85,7 +85,7 @@ rtBuffer<Photon, 1>              photon_buffer;
 
 inline void append(Photon value) {
 	int index = atomicAdd(&length_buffer[0], 1);
-	if (index >= photon_buffer.size()) return;
+	if (index >= photon_buffer.size()) return;//Todo: delete it, it should be ensured by host code
 	photon_buffer[index] = value;
 }
 
@@ -110,7 +110,7 @@ rtDeclareVariable(PerRayData_photon, current_prd, rtPayload, );
 //-----------------------------
 // entrypoint
 //-----------------------------
-void emmit() {
+RT_PROGRAM void emmit() {
 	
 	int lightNum = lights.size();
 	if (lightNum == 0) return;
@@ -190,7 +190,7 @@ rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 rtDeclareVariable(float, t_hit, rtIntersectionDistance, );
 
 
-RT_PROGRAM void diffuse()
+RT_PROGRAM void default_lit_photon_closest_hit()
 {
 	float3 world_shading_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, shading_normal));
 	float3 world_geometric_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));

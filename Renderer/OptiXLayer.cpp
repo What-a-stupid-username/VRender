@@ -149,16 +149,16 @@ void OptiXLayer::Init() {
 		photon_buffer->setElementSize(sizeof(Photon));
 		context["photon_buffer"]->set(photon_buffer);
 
-		Buffer photon_kdtree_buffer;
-		photon_kdtree_buffer = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT2, 10000000);
-		context["photon_kdtree_buffer"]->set(photon_kdtree_buffer);
+		//Buffer photon_kdtree_buffer;
+		//photon_kdtree_buffer = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT2, 10000000);
+		//context["photon_kdtree_buffer"]->set(photon_kdtree_buffer);
 
-		Buffer photon_sorted_pointer_buffer;
-		photon_sorted_pointer_buffer = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT, 3, 10000000);
-		context["photon_sorted_pointer_buffer"]->set(photon_sorted_pointer_buffer);
+		//Buffer photon_sorted_pointer_buffer;
+		//photon_sorted_pointer_buffer = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT, 3, 10000000);
+		//context["photon_sorted_pointer_buffer"]->set(photon_sorted_pointer_buffer);
 
 		// Setup programs
-		const char *ptx = sutil::getPtxString("Renderer", "optixPathTracer.cu");
+		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
 		context->setRayGenerationProgram(0, context->createProgramFromPTXString(ptx, "pathtrace_camera"));
 		context->setExceptionProgram(0, context->createProgramFromPTXString(ptx, "exception"));
 		context->setMissProgram(0, context->createProgramFromPTXString(ptx, "miss"));
@@ -226,29 +226,27 @@ void OptiXLayer::LoadScene() {
 
 
 	// Set up material
-	Material diffuse = context->createMaterial();
+	Material default_lit = context->createMaterial();
 	{
-		const char *ptx = sutil::getPtxString("Renderer", "optixPathTracer.cu");
-		Program diffuse_ch = context->createProgramFromPTXString(ptx, "diffuse");
-		Program diffuse_ah = context->createProgramFromPTXString(ptx, "shadow");
-		Program diffuse_em = context->createProgramFromPTXString(ptx, "diffuseEmitter");
+		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
+		Program default_lit_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_closest_hit");
+		Program default_lit_any_hit = context->createProgramFromPTXString(ptx, "default_lit_any_hit");
 		ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-		Program photon_ch = context->createProgramFromPTXString(ptx, "diffuse");
-		Program light_ah = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
-		diffuse->setClosestHitProgram(0, diffuse_ch);
-		diffuse->setAnyHitProgram(1, diffuse_ah);
-		diffuse->setClosestHitProgram(2, photon_ch);
+		Program default_lit_photon_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_photon_closest_hit");
+		default_lit->setClosestHitProgram(0, default_lit_closest_hit);
+		default_lit->setAnyHitProgram(1, default_lit_any_hit);
+		default_lit->setClosestHitProgram(2, default_lit_photon_closest_hit);
 	}
 
 	
-	Material diffuse_light = context->createMaterial();
+	Material default_light = context->createMaterial();
 	{
-		const char *ptx = sutil::getPtxString("Renderer", "optixPathTracer.cu");
-		Program diffuse_em = context->createProgramFromPTXString(ptx, "diffuseEmitter");
+		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
+		Program default_light_closest_hit = context->createProgramFromPTXString(ptx, "default_light_closest_hit");
 		ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-		Program light_ah = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
-		diffuse_light->setClosestHitProgram(0, diffuse_em);
-		diffuse_light->setAnyHitProgram(2, light_ah);
+		Program default_light_any_hit = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
+		default_light->setClosestHitProgram(0, default_light_closest_hit);
+		default_light->setAnyHitProgram(2, default_light_any_hit);
 	}
 
 	{
@@ -270,85 +268,82 @@ void OptiXLayer::LoadScene() {
 	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
 		make_float3(0.0f, 0.0f, 559.2f),
 		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 
 	// Ceiling
 	gis.push_back(createParallelogram(context, make_float3(0.0f, 548.8f, 0.0f),
 		make_float3(556.0f, 0.0f, 0.0f),
 		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 
 	// Back wall
 	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 559.2f),
 		make_float3(0.0f, 548.8f, 0.0f),
 		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "metallic", 1.f);
+	setMaterial(gis.back(), default_lit, "smoothness", 0.0f);
 
 	// Right wall
 	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
 		make_float3(0.0f, 548.8f, 0.0f),
 		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", blue);
+	setMaterial(gis.back(), default_lit, "albedo", blue);
 
 	// Left wall
 	gis.push_back(createParallelogram(context, make_float3(556.0f, 0.0f, 0.0f),
 		make_float3(0.0f, 0.0f, 559.2f),
 		make_float3(0.0f, 548.8f, 0.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+	setMaterial(gis.back(), default_lit, "albedo", red);
 
 	// Short block
 	gis.push_back(createParallelogram(context, make_float3(130.0f, 165.0f, 65.0f),
 		make_float3(-48.0f, 0.0f, 160.0f),
 		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "trans", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "transparent", 1);
 	gis.push_back(createParallelogram(context, make_float3(290.0f, 0.0f, 114.0f),
 		make_float3(0.0f, 165.0f, 0.0f),
 		make_float3(-50.0f, 0.0f, 158.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "trans", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "transparent", 1);
 	gis.push_back(createParallelogram(context, make_float3(130.0f, 0.0f, 65.0f),
 		make_float3(0.0f, 165.0f, 0.0f),
 		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "trans", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "transparent", 1);
 	gis.push_back(createParallelogram(context, make_float3(82.0f, 0.0f, 225.0f),
 		make_float3(0.0f, 165.0f, 0.0f),
 		make_float3(48.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "trans", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "transparent", 1);
 	gis.push_back(createParallelogram(context, make_float3(240.0f, 0.0f, 272.0f),
 		make_float3(0.0f, 165.0f, 0.0f),
 		make_float3(-158.0f, 0.0f, -47.0f)));
-	setMaterial(gis.back(), diffuse, "trans", 1);
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	setMaterial(gis.back(), default_lit, "albedo", white);
+	setMaterial(gis.back(), default_lit, "transparent", 1);
 
 	// Tall block
 	gis.push_back(createParallelogram(context, make_float3(423.0f, 330.0f, 247.0f),
 		make_float3(-158.0f, 0.0f, 49.0f),
 		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "spec", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 	gis.push_back(createParallelogram(context, make_float3(423.0f, 0.0f, 247.0f),
 		make_float3(0.0f, 330.0f, 0.0f),
 		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "spec", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 	gis.push_back(createParallelogram(context, make_float3(472.0f, 0.0f, 406.0f),
 		make_float3(0.0f, 330.0f, 0.0f),
 		make_float3(-158.0f, 0.0f, 50.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "spec", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 	gis.push_back(createParallelogram(context, make_float3(314.0f, 0.0f, 456.0f),
 		make_float3(0.0f, 330.0f, 0.0f),
 		make_float3(-49.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "spec", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 	gis.push_back(createParallelogram(context, make_float3(265.0f, 0.0f, 296.0f),
 		make_float3(0.0f, 330.0f, 0.0f),
 		make_float3(158.0f, 0.0f, -49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	setMaterial(gis.back(), diffuse, "spec", 1);
+	setMaterial(gis.back(), default_lit, "albedo", white);
 
 	// Create shadow group (no light)
 	GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
@@ -359,7 +354,7 @@ void OptiXLayer::LoadScene() {
 	gis.push_back(createParallelogram(context, make_float3(343.0f, 548.6f, 227.0f),
 		make_float3(0.0f, 0.0f, 105.0f),
 		make_float3(-130.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
+	setMaterial(gis.back(), default_light, "emission_color", light_em);
 
 	// Create geometry group
 	GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
