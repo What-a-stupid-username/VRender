@@ -234,6 +234,31 @@ function(compile_llvm_runtime input symbol output_var)
 endfunction()
 
 ################################################################################
+# Compile the cpp file using clang
+#
+# Usage: cpp_to_bc( input output_var [clang args] )
+#   input      : [in]  File to be compiled by clang
+#   output_var : [out] Generated bc file
+#   clang args : [in]  list of arguments to clang
+#
+
+function(cpp_to_bc  input output_var)
+  set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+  get_filename_component(base "${input}" NAME_WE)
+  get_filename_component(name "${input}" NAME)
+
+  set(bc     "${OUTPUT_DIR}/${base}.bc")
+  add_custom_command( OUTPUT ${bc}
+    COMMAND ${LLVM_TOOLS_BINARY_DIR}/clang    ${input} -c -o ${bc} ${ARGN}
+    COMMENT "Compiling ${name} to ${base}.bc"
+    WORKING_DIRECTORY "${OUTPUT_DIR}"
+    MAIN_DEPENDENCY "${input}"
+    )
+
+  set(${output_var} ${bc} PARENT_SCOPE)
+endfunction()
+
+################################################################################
 # Copy ptx scripts into a string in a cpp header file.
 #
 # Usage: ptx_to_cpp( ptx_cpp_headers my_directory FILE1 FILE2 ... FILEN )
@@ -284,8 +309,8 @@ endmacro( ptx_to_cpp )
 ################################################################################
 # Strip library of all local symbols 
 #
-# Usage: strip_symbols( target_name ) 
-#   target_name : [out] target name for the library to be stripped 
+# Usage: strip_symbols( target ) 
+#   target : [out] target name for the library to be stripped 
 
 function( strip_symbols target )
   if( NOT WIN32 )
@@ -301,17 +326,25 @@ endfunction( strip_symbols )
 ################################################################################
 # Only export the symbols that we need.
 #
-# Usage: optix_setup_exports( target_name export_file ) 
-#   target_name : [in] target name for the library to be stripped 
+# Usage: optix_setup_exports( target export_file hidden_file )
+#   target      : [in] target name for the library to be stripped 
 #   export_file : [in] name of the file that contains the export symbol names
+#   hidden_file : [in] name of the file that contains the hidden symbol names.
+#                      Might be empty string in which all non-exported symbols
+#                      are hidden. Only used for UNIX and NOT APPLE.
 #
 # Do not use this macro with WIN32 DLLs unless you are not using the dllexport
 # macros. The DLL name will be set using the SOVERSION property of the target,
 # so be sure to set that before calling this macro
 #
-function( optix_setup_exports target export_file )
-  # Suck in the exported symbol lists.  It should define exported_symbols
-  include(${export_file})  
+function( optix_setup_exports target export_file hidden_file)
+  # Suck in the exported symbol list. It should define exported_symbols.
+  include(${export_file})
+  # Suck in the hidden symbol list unless hidden_file is empty. It should
+  # definde hidden_symbols.
+  if (NOT "${hidden_file}" STREQUAL "")
+   include(${hidden_file})
+  endif()
   
   if( UNIX )
     if ( APPLE )
@@ -343,12 +376,20 @@ function( optix_setup_exports target export_file )
       # {
       # global:
       # extern "C" {
-      # symbol;
+      # exported_symbol;
       # };
-      # local: *;
+      # local:
+      # hidden_symbol; // or "*";
       # };
+      # Just list the symbols.  One per line.  Since we are treating the list as a string
+      # here we can insert the newline after the ';' character.
       string(REPLACE ";" ";\n" exported_symbol_file_content "${exported_symbols}")
-      file(WRITE ${exported_symbol_file} "{\nglobal:\nextern \"C\" {\n${exported_symbol_file_content};\n};\nlocal: *;\n};\n")
+      if (NOT "${hidden_file}" STREQUAL "")
+        string(REPLACE ";" ";\n" hidden_symbol_file_content "${hidden_symbols}")
+      else()
+        set( hidden_symbol_file_content "*" )
+      endif()
+      file(WRITE ${exported_symbol_file} "{\nglobal:\nextern \"C\" {\n${exported_symbol_file_content};\n};\nlocal:\n${hidden_symbol_file_content};\n};\n")
     endif()
 
     # Add the command to the LINK_FLAGS
@@ -390,7 +431,7 @@ function( optix_setup_exports target export_file )
 endfunction()
 
 ################################################################################
-# Some helper functions for pushing and poping variable values
+# Some helper functions for pushing and popping variable values
 #
 function(push_variable variable)
   #message("push before: ${variable} = ${${variable}}, ${variable}_STACK = ${${variable}_STACK}")
@@ -457,7 +498,7 @@ endfunction()
 #
 function(compile_ptx sm_versions_in generated_files)
   # CUDA_GET_SOURCES_AND_OPTIONS is a FindCUDA internal command that we are going to
-  # borrow.  There's no garantees on backward compatibility using this macro.
+  # borrow.  There are no guarantees on backward compatibility using this macro.
   CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
   # Check to see if they specified an sm version, and spit out an error.
   list(FIND _options -arch arch_index)
@@ -622,7 +663,7 @@ endfunction(cuda_generate_runtime_target_options)
 
 function(compile_sass_to_cpp _generated_files )
   # CUDA_GET_SOURCES_AND_OPTIONS is a FindCUDA internal command that we are going to
-  # borrow.  There's no garantees on backward compatibility using this macro.
+  # borrow.  There are no guarantees on backward compatibility using this macro.
   CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
 
   set(generated_files)
@@ -650,7 +691,7 @@ function(compile_sass_to_cpp _generated_files )
  
     # Now generate a target that will generate the wrapped version of the cuda
     # files at build time
-    set(symbol "${source_basename}_source")
+    set(symbol "${source_basename}_cuda_source")
     add_custom_command( OUTPUT ${cpp_wrap}
        COMMAND ${CMAKE_COMMAND} -DCUDA_BIN2C_EXECUTABLE:STRING="${CUDA_BIN2C_EXECUTABLE}"
        -DCPP_FILE:STRING="${cpp_wrap}"
@@ -687,7 +728,7 @@ endfunction()
 
 function(compile_cuda_to_cpp target_name format _generated_files)
   # CUDA_GET_SOURCES_AND_OPTIONS is a FindCUDA internal command that we are going to
-  # borrow.  There's no garantees on backward compatibility using this macro.
+  # borrow.  There are no guarantees on backward compatibility using this macro.
   CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
 
   if(${format} MATCHES "SEPARABLE_OBJ")
@@ -712,7 +753,66 @@ function(compile_cuda_to_cpp target_name format _generated_files)
 
     # Now generate a target that will generate the wrapped version of the cuda
     # files at build time
-    set(symbol "${source_basename}_source")
+    set(symbol "${source_basename}_cuda_source")
+    add_custom_command( OUTPUT ${cpp_wrap}
+      COMMAND ${CMAKE_COMMAND} -DCUDA_BIN2C_EXECUTABLE:STRING="${CUDA_BIN2C_EXECUTABLE}"
+      -DCPP_FILE:STRING="${cpp_wrap}"
+      -DCPP_SYMBOL:STRING="${symbol}"
+      -DSOURCE_BASE:STRING="${generated_file_path}"
+      -DSOURCES:STRING="${relative_cuda_generated_file}"
+      ARGS -P "${CMAKE_SOURCE_DIR}/CMake/bin2cpp.cmake"
+      DEPENDS ${CMAKE_SOURCE_DIR}/CMake/bin2cpp.cmake ${objfile}
+      )
+    # We know the list of files at configure time, so generate the files here
+    include(bin2cpp)
+    bin2h("${h_wrap}" ${symbol} ${relative_cuda_generated_files})
+
+    list(APPEND ${_generated_files} ${objfile} ${cpp_wrap} ${h_wrap})
+  endforeach()
+  set(${_generated_files} ${${_generated_files}} PARENT_SCOPE)
+endfunction()
+
+# Compile the list of cuda files using the specified format.  Then take the resulting file
+# and store it in a cpp file using bin2c. Appends the variant name to the source file name.
+#
+# Usage: compile_cuda_to_cpp_variant( target_name variant_name format _generated_files files [files...] [OPTIONS ...] )
+#
+# target_name[input] name to use for mangling output files.
+# variant_name[input] name to append to filenames.
+# format[input] OBJ SEPARABLE_OBJ CUBIN FATBIN
+# _generated_files[output] is a list-variable to fill with the names of the generated files
+# ARGN[input] is a list of files and optional CUDA_WRAP_SRCS options.  See documentation
+# for CUDA_WRAP_SRCS in FindCUDA.cmake.
+
+function(compile_cuda_to_cpp_variant target_name variant_name format _generated_files)
+  # CUDA_GET_SOURCES_AND_OPTIONS is a FindCUDA internal command that we are going to
+  # borrow.  There are no guarantees on backward compatibility using this macro.
+  CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
+
+  if(${format} MATCHES "SEPARABLE_OBJ")
+    # It's OK to set this without resetting it later, since this is a function with a
+    # localized scope.
+    set(CUDA_SEPARABLE_COMPILATION ON)
+    set(format OBJ)
+  elseif(${format} MATCHES "PTX")
+    message(FATAL_ERROR "compile_cuda_to_cpp called with PTX format which is unsupported.  Try compile_ptx instead.")
+  endif()
+
+  set(${_generated_files})
+  foreach(source ${_sources})
+    get_filename_component(source_basename "${source}" NAME_WE)
+
+    CUDA_WRAP_SRCS(${target_name}_${variant_name} ${format} objfile ${source} OPTIONS ${_options} )
+
+    set(cpp_wrap "${CMAKE_CURRENT_BINARY_DIR}/${source_basename}_${variant_name}_cuda.cpp")
+    set(h_wrap   "${CMAKE_CURRENT_BINARY_DIR}/${source_basename}_${variant_name}_cuda.h")
+
+    get_filename_component(generated_file_path "${objfile}" DIRECTORY)
+    get_filename_component(relative_cuda_generated_file "${objfile}" NAME)
+
+    # Now generate a target that will generate the wrapped version of the cuda
+    # files at build time
+    set(symbol "${source_basename}_${variant_name}_cuda_source")
     add_custom_command( OUTPUT ${cpp_wrap}
       COMMAND ${CMAKE_COMMAND} -DCUDA_BIN2C_EXECUTABLE:STRING="${CUDA_BIN2C_EXECUTABLE}"
       -DCPP_FILE:STRING="${cpp_wrap}"
@@ -747,6 +847,9 @@ function(compile_ptx_to_cpp input_ptx _generated_files extra_dependencies )
   # use this function to easily extract options
   CUDA_GET_SOURCES_AND_OPTIONS( _ptx_wrap_sources _ptx_wrap_cmake_options _ptx_wrap_options ${ARGN})
 
+  # extract all macro definitions so we can pass these to the c preprocessor
+  string(REGEX MATCHALL "-D[A-z_][A-z_0-9]*(=[A-z_0-9]*)?" macros ${ARGN})
+
   set(fatbin_command)
   set(cubin_commands)
 
@@ -766,7 +869,7 @@ function(compile_ptx_to_cpp input_ptx _generated_files extra_dependencies )
     set(cubin            ${build_directory}/${source_basename}.${cuda_sm}.cubin)
 
     list(APPEND cubin_commands
-      COMMAND ${preprocess_command} -DPTXAS ${PTXAS_INCLUDES} -D__CUDA_TARGET__=${cuda_sm} -D__CUDA_ARCH__=${cuda_sm}0 ${source_ptx} > ${preprocessed_ptx}
+      COMMAND ${preprocess_command} -DPTXAS  ${macros} ${PTXAS_INCLUDES} -D__CUDA_TARGET__=${cuda_sm} -D__CUDA_ARCH__=${cuda_sm}0 ${source_ptx} > ${preprocessed_ptx}
       COMMAND ${CUDA_NVCC_EXECUTABLE} ${_ptx_wrap_options} -arch=sm_${cuda_sm} --cubin ${preprocessed_ptx} -dc -o ${cubin}
       )
     list(APPEND fatbin_command "--image=profile=sm_${cuda_sm},file=${cubin}")
@@ -903,3 +1006,32 @@ function(optix_add_subdirectory_sources dir source_list_var)
   set(${source_list_var} ${sources} PARENT_SCOPE)
 endfunction()
 
+################################################################
+# optixSharedLibraryResources
+#
+# Handle common logic for Windows resource script generation for shared
+# libraries.  The variable 'resourceFiles' is set on the parent scope for
+# use in add_library.
+#
+# outputName - The value to assign to 'output_name' in the parent scope
+#              and used to locate the resource script template to configure.
+#
+# Side effects:
+#
+# output_name   - Value to be used for the OUTPUT_NAME property of the target.
+# resourceFiles - List of resource files to be added to the target.
+#
+macro( optixSharedLibraryResources outputName )
+  set( resourceFiles )
+  set( output_name ${outputName} )
+  if( WIN32 )
+    # On Windows, we want the version number in the DLL filename.
+    # Windows ignores the SOVERSION property and only uses the OUTPUT_NAME property.
+    # Linux puts the version number in the filename from the SOVERSION property.
+    # We need to adjust this variable before we call configure_file.
+    set( output_name "${outputName}.${OPTIX_ABI_VERSION}" )
+    configure_file( "${outputName}.rc.in" "${outputName}.rc" @ONLY )
+    set( resourceFiles "${CMAKE_CURRENT_BINARY_DIR}/${outputName}.rc" "${CMAKE_BINARY_DIR}/include/optix_rc.h" )
+    source_group( Resources FILES ${resourceFiles} )
+  endif()
+endmacro()

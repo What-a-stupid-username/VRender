@@ -1,8 +1,13 @@
-#pragma once
+#ifndef PBS_H_
+#define PBS_H_
+
+
 
 #include <optixu/optixu_math_namespace.h>
 #include "optixPathTracer.h"
-#include "random.h"                                    
+#include "random.h"   
+
+using namespace optix;
 
 //-----------------------------------------------------------------------------
 //
@@ -18,6 +23,25 @@ struct SurfaceInfo {
 	float3 normal;
 };
 
+//-----------------------------------------------------------------------------
+//
+//  Helper funcs
+//
+//-----------------------------------------------------------------------------
+
+#define M_E        2.71828182845904523536   // e
+#define M_LOG2E    1.44269504088896340736   // log2(e)
+#define M_LOG10E   0.434294481903251827651  // log10(e)
+#define M_LN2      0.693147180559945309417  // ln(2)
+#define M_LN10     2.30258509299404568402   // ln(10)
+#define M_PI       3.14159265358979323846   // pi
+#define M_PI_2     1.57079632679489661923   // pi/2
+#define M_PI_4     0.785398163397448309616  // pi/4
+#define M_1_PI     0.318309886183790671538  // 1/pi
+#define M_2_PI     0.636619772367581343076  // 2/pi
+#define M_2_SQRTPI 1.12837916709551257390   // 2/sqrt(pi)
+#define M_SQRT2    1.41421356237309504880   // sqrt(2)
+#define M_SQRT1_2  0.707106781186547524401  // 1/sqrt(2)
 
 inline float Pow4(float x)
 {
@@ -121,7 +145,7 @@ inline float GGXTerm(float NdotH, float roughness)
 	float a2 = roughness * roughness;
 	float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
 	return M_1_PI * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
-												// therefore epsilon is smaller than what can be represented by float
+										  // therefore epsilon is smaller than what can be represented by float
 }
 
 inline float3 FresnelTerm(float3 F0, float cosA)
@@ -164,8 +188,8 @@ float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothne
 
 	float specularTerm = V * D * M_PI;
 
-	specularTerm = max(0, specularTerm * nl);
-	
+	specularTerm = max(0.0f, specularTerm * nl);
+
 	specularTerm *= any(specColor) ? 1.0 : 0.0;
 
 
@@ -175,7 +199,7 @@ float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothne
 }
 
 
-float3 PBS(const float2 seed, const SurfaceInfo IN, const float3 lightDir, const float3 lightSatu, const float3 viewDir) {
+float3 PBS(const SurfaceInfo IN, const float3 lightDir, const float3 lightSatu, const float3 viewDir) {
 	float3 color;
 
 	float oneMinusReflectivity;
@@ -183,19 +207,46 @@ float3 PBS(const float2 seed, const SurfaceInfo IN, const float3 lightDir, const
 	baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, /*ref*/ specColor, /*ref*/ oneMinusReflectivity);
 
 	float3 normal = IN.normal;
-	float4 worldPos = IN.worldPos;
 
 	color = BRDF(baseColor, specColor, IN.smoothness, normal, viewDir, lightDir, lightSatu);
 	return color;
 }
 
 
-inline void uniform_sample_hemisphere(float2 E, float3& p) {
-	float Phi = 2 * M_PI * E.x;
-	float CosTheta = E.y;
+inline void uniform_sample_hemisphere(float x, float y, float3& p) {
+	float Phi = 2 * M_PI * x;
+	float CosTheta = y;
 	float SinTheta = sqrt(1 - CosTheta * CosTheta);
 
 	p.x = SinTheta * cos(Phi);
-	p.y = SinTheta * sin(Phi);
-	p.z = CosTheta;
+	p.z = SinTheta * sin(Phi);
+	p.y = CosTheta;
 }
+
+inline float NDF(const float3& h, float roughness) {
+	float alpha = roughness * roughness;
+	float alpha2 = alpha * alpha;
+	float NoH = h.z;
+	float k = NoH * NoH*(alpha2 - 1) + 1;
+	return alpha2 / (M_PI * k * k);
+}
+
+void sample_GGX(float2 E, const float smoothness, float3 & n, float & pd) {
+
+	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
+	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+	// 根据 NDF 采样 h
+	float Xi1 = E.x;
+	float Xi2 = E.y;
+	float alpha = roughness * roughness;
+	float cosTheta2 = (1 - Xi1) / (Xi1*(alpha*alpha - 1) + 1);	//float cosTheta2 = (1 - Xi1) / max((1 - a2 * Xi1), 0.001);
+	float cosTheta = sqrt(cosTheta2);
+	float sinTheta = sqrt(1 - cosTheta2);
+	float phi = 2 * M_PI * Xi2;
+
+	n = make_float3(sinTheta*cos(phi), sinTheta*sin(phi), cosTheta);
+	pd = min(NDF(n, roughness) / 4.0f,10.0f);
+}
+
+
+#endif // !PBS_H_

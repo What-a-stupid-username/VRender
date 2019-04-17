@@ -70,7 +70,6 @@ rtDeclareVariable(float3,        bad_color, , );
 rtDeclareVariable(unsigned int,  frame_number, , );
 rtDeclareVariable(unsigned int,  rnd_seed, , );
 rtDeclareVariable(unsigned int,  sqrt_num_samples, , );
-rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtDeclareVariable(unsigned int,  common_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
@@ -113,7 +112,9 @@ RT_PROGRAM void pathtrace_camera()
         Ray ray = make_Ray(ray_origin, ray_direction, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
-        result += prd.radiance;
+		float sat = 50;
+		result += make_float3(min(prd.radiance.x,sat), min(prd.radiance.y, sat), min(prd.radiance.z, sat));
+
 
     } while (--samples_per_pixel);
 
@@ -159,7 +160,7 @@ RT_PROGRAM void default_light_closest_hit() //ray-type = 0(normal_ray)
 rtDeclareVariable(float3,		albedo, , );
 rtDeclareVariable(float,		transparent, , ) = 0.f;
 rtDeclareVariable(float,		metallic, , ) = 0.f;
-rtDeclareVariable(float,		smoothness, , ) = 0.5f;
+rtDeclareVariable(float,		smoothness, , ) = 0.f;
 rtDeclareVariable(float,		refraction_index, , ) = 1.5f;
 
 
@@ -181,6 +182,7 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 	float z1 = rnd(current_prd.seed);
 	current_prd.seed += 197;
 	float z2 = rnd(current_prd.seed);
+	float3 baseColor;
 
 	// initialize surface info
 	SurfaceInfo IN;
@@ -191,6 +193,7 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 	IN.normal = ffnormal;
 
 	current_prd.radiance = make_float3(0);
+
 	{
 		int in_to_out = dot(ray.direction, world_geometric_normal) > 0;
 
@@ -203,13 +206,13 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 
 		float3 a;
 		float b;
-		float3 baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
+		baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
 
 		if (current_prd.depth < 6) 
 		{
 			{
 				float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
-				if (z1 < max_diffuse * transparent) //透射部分
+				if (z1 < max_diffuse * transparent / 4) //透射部分
 				{
 					if (refract(p, ray.direction, ffnormal, in_to_out ? 1.0f / refraction_index : refraction_index)) {
 						prd.countEmitted = false;
@@ -218,7 +221,7 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 
 						rtTrace(top_object, next_ray, prd);
 
-						current_prd.radiance += prd.radiance * baseColor / max_diffuse;
+						current_prd.radiance += prd.radiance * baseColor / max_diffuse * 4;
 					}
 				}
 				if (!in_to_out) {
@@ -236,29 +239,32 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 					}
 				}
 			}
-			if (z1 < 1.f / (current_prd.depth + 4))
+			if (z1 < 1.f / (current_prd.depth+3))
 			{// 反射部分
 				float pd = M_PI;
-				float3 n;
-				uniform_sample_hemisphere(z1, z2, n);
-				//sample_GGX(make_float2(z1, z2), IN.smoothness, n, pd);
+				float3 n = make_float3(0,0,1);
+				//uniform_sample_hemisphere(z1, z2, n);
+				sample_GGX(make_float2(z1, z2), IN.smoothness, n, pd);
 				if (pd != 0) {
 					optix::Onb onb(ffnormal);
 					onb.inverse_transform(n);
 					p = reflect(ray.direction, n);
 
-					prd.countEmitted = false;
+					if (dot(p, ffnormal) > 0) {
+						prd.countEmitted = false;
 
-					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
-					rtTrace(top_object, next_ray, prd);
+						rtTrace(top_object, next_ray, prd);
 
-					current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth + 4) / pd;
+						current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth+3) / pd;
+					}
 				}
 			}
 		}
 	}
 	
+	if (z1 > 1.f / (current_prd.depth + 1)) return;
 
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
@@ -289,11 +295,11 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 				const float A = length(cross(light.v1, light.v2));
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
-				result += PBS(IN, L, light.emission * weight * shadow_prd.inShadow, -ray.direction);
+				float3 light_satu = light.emission * weight * shadow_prd.inShadow;
+				current_prd.radiance += (PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor) * (current_prd.depth + 1);
 			}
 		}
 	}
-	current_prd.radiance += result * albedo;
 }
 
 

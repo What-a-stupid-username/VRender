@@ -959,6 +959,11 @@ struct PtxSourceCache
         for( std::map<std::string, std::string *>::const_iterator it = map.begin(); it != map.end(); ++it )
             delete it->second;
     }
+	void Clear() { 
+		for (std::map<std::string, std::string *>::const_iterator it = map.begin(); it != map.end(); ++it)
+			delete it->second;
+		map.clear();
+	};
 };
 static PtxSourceCache g_ptxSourceCache;
 
@@ -992,6 +997,10 @@ const char* sutil::getPtxString(
     }
 
     return ptx->c_str();
+}
+
+void sutil::ClearPtxCache() {
+	g_ptxSourceCache.Clear();
 }
 
 void sutil::ensureMinimumSize(int& w, int& h)

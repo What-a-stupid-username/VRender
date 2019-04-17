@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CommonInclude.h"
+#include <mutex>
 
 class Camera {
 	friend class OptiXLayer;
@@ -13,6 +14,8 @@ private:
 
 	uint staticFrameNum = 1;
 	bool dirty = true;
+
+private:
 
 	bool UpdateOptiXContext(Context context, float width, float height, bool fource = false);
 public:
@@ -40,18 +43,25 @@ private:
 	uint32_t       screenWidth = 512;
 	uint32_t       screenHeight = 512;
 
-	int            sqrt_num_samples = 1;
-	int            rr_begin_depth = 1;
+	int            sqrt_num_samples = 2;
 
 	bool dirty = true;
+
+	mutex rendering;
 
 	Camera camera;
 
 	PostprocessingStage tonemapStage, denoiserStage;
 
+	CommandList cb;
+
+public:
+	bool pause = false;
 	float exposure = 3.f, gamma = 2.2f;
 
-	CommandList cb;
+	enum ResultBufferType { origial, tonemap, denoise };
+	ResultBufferType resultType =  origial;
+
 private:
 	void Init();
 	OptiXLayer() {
@@ -78,6 +88,22 @@ public:
 	inline static Buffer DenoisedBuffer() {
 		return Instance().context["output_denoisedBuffer"]->getBuffer();
 	}
+
+	inline static Buffer GetResult() {
+		auto& layer = Instance();
+		switch (layer.resultType)
+		{
+		case origial:
+			return layer.context["output_buffer"]->getBuffer();
+		case tonemap:
+			return layer.context["tonemapped_buffer"]->getBuffer();
+		case denoise:
+			return layer.context["output_denoisedBuffer"]->getBuffer();
+		default:
+			break;
+		}
+	}
+
 
 	inline const static Context Context() {
 		return Instance().context;
@@ -110,11 +136,13 @@ public:
 
 	static bool ResizeBuffer(int& w, int& h);
 
-	static void RebuildCommandList(bool openPost = false, bool remain = true);
+	static void RebuildCommandList(bool openPost = false);
 
 	inline static void GetBufferSize(float& w, float& h) {
 		auto& layer = Instance();
 		w = layer.screenWidth;
 		h = layer.screenHeight;
 	}
+
+	static void SaveResultToFile(string name);
 };

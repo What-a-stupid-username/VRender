@@ -36,7 +36,7 @@ public:
 	void PostProcess() {
 		static bool on = false;
 		on = !on;
-		OptiXLayer::RebuildCommandList(on, false);
+		OptiXLayer::RebuildCommandList(on);
 		if (on) buffer = 2;
 		else buffer = 0;
 	}

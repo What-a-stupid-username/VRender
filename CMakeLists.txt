@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.8 FATAL_ERROR)
 
 cmake_policy(VERSION 2.6)
 
+
 project(VRenderer)
 
 set(CMAKE_AUTOMOC ON)
@@ -245,7 +246,10 @@ function(add_sample_executable target_name)
     ${optix_rpath}
     Qt5::Widgets
     Qt5::OpenGL
+	Imgui
     )
+	
+  add_dependencies(${target_name} Imgui)
 
   if( UNIX AND NOT APPLE )
     # Force using RPATH instead of RUNPATH on Debian
@@ -258,14 +262,15 @@ function(add_sample_executable target_name)
 endfunction()
 
 #########################################################
-#  Add exe
+#  Main
 #########################################################
 
+link_directories(${PROJECT_BINARY_DIR}/libs)
+
+add_subdirectory(Imgui)
+INCLUDE_DIRECTORIES(Imgui_INCLUDE_DIR)
 
 add_subdirectory(Renderer)
-
-
-
 
 
 

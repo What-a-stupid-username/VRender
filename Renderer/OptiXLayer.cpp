@@ -124,13 +124,14 @@ void OptiXLayer::Init() {
 		context = Context::create();
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
-		context->setStackSize(1800);
+		context->setStackSize(3600);
+		//context->setMaxCallableProgramDepth(9);
+		context->setMaxTraceDepth(9);
 
 		context["scene_epsilon"]->setFloat(1.e-3f);
 		context["common_ray_type"]->setUint(0u);
 		context["pathtrace_shadow_ray_type"]->setUint(1u);
 		context["photon_ray_type"]->setUint(2u);
-		context["rr_begin_depth"]->setUint(rr_begin_depth);
 
 		Buffer buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, screenWidth, screenHeight, false);
 		context["output_buffer"]->set(buffer);
@@ -206,166 +207,190 @@ OptiXLayer & OptiXLayer::Instance() {
 }
 
 void OptiXLayer::LoadScene() {
-	auto context = Context();
-	// Light buffer
-	const float3 light_em = make_float3(15, 15, 15);
-	ParallelogramLight light;
-	light.corner = make_float3(343.0f, 548.6f, 227.0f);
-	light.v1 = make_float3(0.0f, 0.0f, 105.0f);
-	light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
-	light.normal = normalize(cross(light.v1, light.v2));
-	light.emission = light_em;
+	Instance().rendering.lock();
 
-	Buffer light_buffer = context->createBuffer(RT_BUFFER_INPUT);
-	light_buffer->setFormat(RT_FORMAT_USER);
-	light_buffer->setElementSize(sizeof(ParallelogramLight));
-	light_buffer->setSize(1u);
-	memcpy(light_buffer->map(), &light, sizeof(light));
-	light_buffer->unmap();
-	context["lights"]->setBuffer(light_buffer);
-
-
-	// Set up material
-	Material default_lit = context->createMaterial();
+	try
 	{
-		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
-		Program default_lit_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_closest_hit");
-		Program default_lit_any_hit = context->createProgramFromPTXString(ptx, "default_lit_any_hit");
-		ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-		Program default_lit_photon_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_photon_closest_hit");
-		default_lit->setClosestHitProgram(0, default_lit_closest_hit);
-		default_lit->setAnyHitProgram(1, default_lit_any_hit);
-		default_lit->setClosestHitProgram(2, default_lit_photon_closest_hit);
-	}
+		auto context = Context();
+		// Light buffer
+		const float3 light_em = make_float3(15, 15, 15);
+		ParallelogramLight light;
+		light.corner = make_float3(343.0f, 548.6f, 227.0f);
+		light.v1 = make_float3(0.0f, 0.0f, 105.0f);
+		light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
+		light.normal = normalize(cross(light.v1, light.v2));
+		light.emission = light_em;
 
-	
-	Material default_light = context->createMaterial();
+		Buffer light_buffer = context->createBuffer(RT_BUFFER_INPUT);
+		light_buffer->setFormat(RT_FORMAT_USER);
+		light_buffer->setElementSize(sizeof(ParallelogramLight));
+		light_buffer->setSize(1u);
+		memcpy(light_buffer->map(), &light, sizeof(light));
+		light_buffer->unmap();
+		context["lights"]->setBuffer(light_buffer);
+
+
+		// Set up material
+		Material default_lit = context->createMaterial();
+		{
+			const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
+			Program default_lit_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_closest_hit");
+			Program default_lit_any_hit = context->createProgramFromPTXString(ptx, "default_lit_any_hit");
+			ptx = sutil::getPtxString("Renderer", "photon_map.cu");
+			Program default_lit_photon_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_photon_closest_hit");
+			default_lit->setClosestHitProgram(0, default_lit_closest_hit);
+			default_lit->setAnyHitProgram(1, default_lit_any_hit);
+			default_lit->setClosestHitProgram(2, default_lit_photon_closest_hit);
+		}
+
+
+		Material default_light = context->createMaterial();
+		{
+			const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
+			Program default_light_closest_hit = context->createProgramFromPTXString(ptx, "default_light_closest_hit");
+			ptx = sutil::getPtxString("Renderer", "photon_map.cu");
+			Program default_light_any_hit = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
+			default_light->setClosestHitProgram(0, default_light_closest_hit);
+			default_light->setAnyHitProgram(2, default_light_any_hit);
+		}
+
+		{
+			// Set up parallelogram programs
+			const char *ptx = sutil::getPtxString("Renderer", "parallelogram.cu");
+			pgram_bounding_box = context->createProgramFromPTXString(ptx, "bounds");
+			pgram_intersection = context->createProgramFromPTXString(ptx, "intersect");
+		}
+
+
+		// create geometry instances
+		std::vector<GeometryInstance> gis;
+
+		const float3 white = make_float3(0.8f, 0.8f, 0.8f);
+		const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
+		const float3 red = make_float3(0.8f, 0.05f, 0.05f);
+
+		// Floor
+		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
+			make_float3(0.0f, 0.0f, 559.2f),
+			make_float3(556.0f, 0.0f, 0.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+
+		// Ceiling
+		gis.push_back(createParallelogram(context, make_float3(0.0f, 548.8f, 0.0f),
+			make_float3(556.0f, 0.0f, 0.0f),
+			make_float3(0.0f, 0.0f, 559.2f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+
+		// Back wall
+		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 559.2f),
+			make_float3(0.0f, 548.8f, 0.0f),
+			make_float3(556.0f, 0.0f, 0.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+
+		// Right wall
+		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
+			make_float3(0.0f, 548.8f, 0.0f),
+			make_float3(0.0f, 0.0f, 559.2f)));
+		setMaterial(gis.back(), default_lit, "albedo", blue);
+
+		// Left wall
+		gis.push_back(createParallelogram(context, make_float3(556.0f, 0.0f, 0.0f),
+			make_float3(0.0f, 0.0f, 559.2f),
+			make_float3(0.0f, 548.8f, 0.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", red);
+
+		// Short block
+		gis.push_back(createParallelogram(context, make_float3(130.0f, 165.0f, 65.0f),
+			make_float3(-48.0f, 0.0f, 160.0f),
+			make_float3(160.0f, 0.0f, 49.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "transparent", 1);
+		gis.push_back(createParallelogram(context, make_float3(290.0f, 0.0f, 114.0f),
+			make_float3(0.0f, 165.0f, 0.0f),
+			make_float3(-50.0f, 0.0f, 158.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "transparent", 1);
+		gis.push_back(createParallelogram(context, make_float3(130.0f, 0.0f, 65.0f),
+			make_float3(0.0f, 165.0f, 0.0f),
+			make_float3(160.0f, 0.0f, 49.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "transparent", 1);
+		gis.push_back(createParallelogram(context, make_float3(82.0f, 0.0f, 225.0f),
+			make_float3(0.0f, 165.0f, 0.0f),
+			make_float3(48.0f, 0.0f, -160.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "transparent", 1);
+		gis.push_back(createParallelogram(context, make_float3(240.0f, 0.0f, 272.0f),
+			make_float3(0.0f, 165.0f, 0.0f),
+			make_float3(-158.0f, 0.0f, -47.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "transparent", 1);
+
+		// Tall block
+		gis.push_back(createParallelogram(context, make_float3(423.0f, 330.0f, 247.0f),
+			make_float3(-158.0f, 0.0f, 49.0f),
+			make_float3(49.0f, 0.0f, 159.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+		gis.push_back(createParallelogram(context, make_float3(423.0f, 0.0f, 247.0f),
+			make_float3(0.0f, 330.0f, 0.0f),
+			make_float3(49.0f, 0.0f, 159.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+		gis.push_back(createParallelogram(context, make_float3(472.0f, 0.0f, 406.0f),
+			make_float3(0.0f, 330.0f, 0.0f),
+			make_float3(-158.0f, 0.0f, 50.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+		gis.push_back(createParallelogram(context, make_float3(314.0f, 0.0f, 456.0f),
+			make_float3(0.0f, 330.0f, 0.0f),
+			make_float3(-49.0f, 0.0f, -160.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+		gis.push_back(createParallelogram(context, make_float3(265.0f, 0.0f, 296.0f),
+			make_float3(0.0f, 330.0f, 0.0f),
+			make_float3(158.0f, 0.0f, -49.0f)));
+		setMaterial(gis.back(), default_lit, "albedo", white);
+		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+
+		// Create shadow group (no light)
+		GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
+		shadow_group->setAcceleration(context->createAcceleration("Trbvh"));
+		context["top_shadower"]->set(shadow_group);
+
+		// Light
+		gis.push_back(createParallelogram(context, make_float3(343.0f, 548.6f, 227.0f),
+			make_float3(0.0f, 0.0f, 105.0f),
+			make_float3(-130.0f, 0.0f, 0.0f)));
+		setMaterial(gis.back(), default_light, "emission_color", light_em);
+
+		// Create geometry group
+		GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
+		geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
+		context["top_object"]->set(geometry_group);
+
+		Instance().dirty = true;
+	}
+	catch (const std::exception&)
 	{
-		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
-		Program default_light_closest_hit = context->createProgramFromPTXString(ptx, "default_light_closest_hit");
-		ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-		Program default_light_any_hit = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
-		default_light->setClosestHitProgram(0, default_light_closest_hit);
-		default_light->setAnyHitProgram(2, default_light_any_hit);
-	}
 
-	{
-		// Set up parallelogram programs
-		const char *ptx = sutil::getPtxString("Renderer", "parallelogram.cu");
-		pgram_bounding_box = context->createProgramFromPTXString(ptx, "bounds");
-		pgram_intersection = context->createProgramFromPTXString(ptx, "intersect");
-	}
-
-
-	// create geometry instances
-	std::vector<GeometryInstance> gis;
-
-	const float3 white = make_float3(0.8f, 0.8f, 0.8f);
-	const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
-	const float3 red = make_float3(0.8f, 0.05f, 0.05f);
-
-	// Floor
-	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-
-	// Ceiling
-	gis.push_back(createParallelogram(context, make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(556.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-
-	// Back wall
-	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "metallic", 1.f);
-	setMaterial(gis.back(), default_lit, "smoothness", 0.0f);
-
-	// Right wall
-	gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), default_lit, "albedo", blue);
-
-	// Left wall
-	gis.push_back(createParallelogram(context, make_float3(556.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(0.0f, 548.8f, 0.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", red);
-
-	// Short block
-	gis.push_back(createParallelogram(context, make_float3(130.0f, 165.0f, 65.0f),
-		make_float3(-48.0f, 0.0f, 160.0f),
-		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "transparent", 1);
-	gis.push_back(createParallelogram(context, make_float3(290.0f, 0.0f, 114.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(-50.0f, 0.0f, 158.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "transparent", 1);
-	gis.push_back(createParallelogram(context, make_float3(130.0f, 0.0f, 65.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "transparent", 1);
-	gis.push_back(createParallelogram(context, make_float3(82.0f, 0.0f, 225.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(48.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "transparent", 1);
-	gis.push_back(createParallelogram(context, make_float3(240.0f, 0.0f, 272.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(-158.0f, 0.0f, -47.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	setMaterial(gis.back(), default_lit, "transparent", 1);
-
-	// Tall block
-	gis.push_back(createParallelogram(context, make_float3(423.0f, 330.0f, 247.0f),
-		make_float3(-158.0f, 0.0f, 49.0f),
-		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	gis.push_back(createParallelogram(context, make_float3(423.0f, 0.0f, 247.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	gis.push_back(createParallelogram(context, make_float3(472.0f, 0.0f, 406.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(-158.0f, 0.0f, 50.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	gis.push_back(createParallelogram(context, make_float3(314.0f, 0.0f, 456.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(-49.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-	gis.push_back(createParallelogram(context, make_float3(265.0f, 0.0f, 296.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(158.0f, 0.0f, -49.0f)));
-	setMaterial(gis.back(), default_lit, "albedo", white);
-
-	// Create shadow group (no light)
-	GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
-	shadow_group->setAcceleration(context->createAcceleration("Trbvh"));
-	context["top_shadower"]->set(shadow_group);
-
-	// Light
-	gis.push_back(createParallelogram(context, make_float3(343.0f, 548.6f, 227.0f),
-		make_float3(0.0f, 0.0f, 105.0f),
-		make_float3(-130.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), default_light, "emission_color", light_em);
-
-	// Create geometry group
-	GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
-	geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
-	context["top_object"]->set(geometry_group);
-
-	Instance().dirty = true;
+		Instance().rendering.unlock();
+		return;
+	}	
+	Instance().rendering.unlock();
 }
 
 void OptiXLayer::RenderResult(uint maxFrame) {
 	auto& layer = Instance();
+	if (layer.pause) return;
+	layer.rendering.lock();
 	layer.camera.UpdateOptiXContext(layer.context, layer.screenWidth, layer.screenHeight, layer.dirty);
 	if (layer.camera.staticFrameNum > maxFrame) return;
 	try {
@@ -385,8 +410,10 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 	}
 	catch (Exception& e) {
 		cout << e.getErrorString() << endl;
+		layer.rendering.unlock();
+		return;
 	}
-	
+	layer.rendering.unlock();
 }
 
 bool OptiXLayer::ResizeBuffer(int & w, int & h) {
@@ -395,6 +422,7 @@ bool OptiXLayer::ResizeBuffer(int & w, int & h) {
 	auto& layer = Instance();
 	if (w == layer.screenWidth&& h == layer.screenHeight) return false;
 
+	layer.rendering.lock();
 	layer.screenWidth = w;
 	layer.screenHeight = h;
 
@@ -402,17 +430,19 @@ bool OptiXLayer::ResizeBuffer(int & w, int & h) {
 	sutil::resizeBuffer(OptiXLayer::ToneMappedBuffer(), w, h);
 	sutil::resizeBuffer(OptiXLayer::DenoisedBuffer(), w, h);
 
+	layer.rendering.unlock();
 	RebuildCommandList();
 
+	layer.rendering.lock();
 	layer.camera.UpdateOptiXContext(layer.context, layer.screenWidth, layer.screenHeight, true);
+	layer.rendering.unlock();
+
 	return true;
 }
 
-void OptiXLayer::RebuildCommandList(bool openPost, bool remain) {
-	static bool save_setting = false;
-	if (remain) openPost = save_setting;
-	else save_setting = openPost;
+void OptiXLayer::RebuildCommandList(bool openPost) {
 	auto& layer = Instance();
+	layer.rendering.lock();
 	layer.cb->destroy();
 	layer.cb = layer.context->createCommandList();
 	layer.cb->appendLaunch(0, layer.screenWidth, layer.screenHeight);
@@ -422,4 +452,15 @@ void OptiXLayer::RebuildCommandList(bool openPost, bool remain) {
 		layer.cb->appendPostprocessingStage(layer.denoiserStage, layer.screenWidth, layer.screenHeight);
 	}
 	layer.cb->finalize();
+	layer.rendering.unlock();
+}
+
+void OptiXLayer::SaveResultToFile(string name)
+{
+	auto& layer = Instance();
+	layer.rendering.lock();
+
+	sutil::displayBufferPPM(&name[0], layer.GetResult());
+
+	layer.rendering.unlock();
 }

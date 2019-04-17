@@ -54,38 +54,7 @@ int buffer = 0;
 
 void glutKeyboardPress(unsigned char k, int x, int y)
 {
-	switch (k)
-	{
-	case('s'):
-	{
-		const std::string outputImage = "screenshot.ppm";
-		std::cerr << "Saving current frame to '" << outputImage << "'\n";
-		sutil::displayBufferPPM(outputImage.c_str(), OptiXLayer::OriginBuffer(), false);
-		break;
-	}
-	case('w'):
-	{
-		OptiXLayer::ClearScene();
-		OptiXLayer::LoadScene();
-		break;
-	}
-	case('b'):
-	{
-		buffer++;
-		buffer %= 3;
-		break;
-	}
-	case('o'):
-	{
-		OptiXLayer::ChangeExposure(-0.02);
-		break;
-	}
-	case('p'):
-	{
-		OptiXLayer::ChangeExposure(0.02);
-		break;
-	}
-	}
+	
 }
 
 void glutResize(int w, int h)
@@ -97,35 +66,22 @@ void glutResize(int w, int h)
 }
 
 
+HWND GL_Window;
+HWND DX_Window;
+
 void glutDisplay()
 {
 	OptiXLayer::RenderResult();
 
-	switch (buffer)
-	{
-	case 0:
-		sutil::displayBufferGL(OptiXLayer::OriginBuffer());
-		break;
-	case 1:
-		sutil::displayBufferGL(OptiXLayer::ToneMappedBuffer(), BUFFER_PIXEL_FORMAT_DEFAULT, true);
-		break;
-	case 2:
-		sutil::displayBufferGL(OptiXLayer::DenoisedBuffer(), BUFFER_PIXEL_FORMAT_DEFAULT, true);
-		break;
-	}
-
-	{
-		int k = OptiXLayer::Camera().StaticFrameNum();
-		sutil::displayFps(k);
-		static char text_[32];
-		sprintf(text_, "frame: %d", k);
-		string text = string(text_);
-		sutil::displayText(text.c_str(), 200, 10);
-	}
+	sutil::displayBufferGL(OptiXLayer::GetResult());
 
 	glutSwapBuffers();
-}
 
+	RECT rect, rect2;
+	GetWindowRect(GL_Window, &rect);
+	GetWindowRect(DX_Window, &rect2);
+	MoveWindow(GL_Window, rect2.left - (rect.right - rect.left), rect2.top, rect.right - rect.left, rect.bottom - rect.top, FALSE);
+}
 
 void glutInitialize(int* argc, char** argv)
 {
@@ -134,6 +90,11 @@ void glutInitialize(int* argc, char** argv)
 	glutInitWindowSize(512, 512);
 	glutInitWindowPosition(100, 100);
 	glutCreateWindow("VRenderer");
+	GL_Window = GetActiveWindow();
+	LONG_PTR Style = ::GetWindowLongPtr(GL_Window, GWL_STYLE);
+	Style = Style &~WS_MAXIMIZEBOX;
+	::SetWindowLongPtr(GL_Window, GWL_STYLE, Style);
+
 	glutHideWindow();
 }
 

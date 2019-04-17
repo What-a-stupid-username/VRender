@@ -12,6 +12,7 @@ add_sample_executable(Renderer
 	OptiXLayer.h
 	OptiXLayer.cpp
 	VDebug.h
+	GUI.hpp
 
 
     glviewer.h
@@ -20,11 +21,6 @@ add_sample_executable(Renderer
     vector_widget.cpp
     transform_widget.h
     transform_widget.cpp
-
-
-    # These files are common among multiple samples
-    parallelogram.cu
-    random.h
 )
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)

@@ -198,6 +198,8 @@ SUTILAPI const char* getPtxString(
         const char* filename,               // Cuda C input file name
         const char** log = NULL );          // (Optional) pointer to compiler log string. If *log == NULL there is no output. Only valid until the next getPtxString call
 
+void SUTILAPI ClearPtxCache();
+
 // Ensures that width and height have the minimum size to prevent launch errors.
 void SUTILAPI ensureMinimumSize(
     int& width,                             // Will be assigned the minimum suitable width if too small.
