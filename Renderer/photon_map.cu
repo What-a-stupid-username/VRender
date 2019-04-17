@@ -1,5 +1,5 @@
 #include <optixu/optixu_math_namespace.h>
-#include "optixPathTracer.h"
+#include "DataBridge.h"
 #include "random.h"
 
 using namespace optix;

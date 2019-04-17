@@ -4,7 +4,6 @@
 
 
 #include <optixu/optixu_math_namespace.h>
-#include "optixPathTracer.h"
 #include "random.h"   
 
 using namespace optix;
@@ -84,34 +83,34 @@ inline float4 Pow5(float4 x)
 }
 
 
-inline float saturate(float in) {
+inline float saturate(const float in) {
 	return min(max(in, 0.0f), 1.0f);
 }
 
-inline bool any(float3 in) {
+inline bool any(const float3 in) {
 	return (in.x * in.y * in.z) != 0;
 }
 
-inline float OneMinusReflectivityFromMetallic(float metallic)
+inline float OneMinusReflectivityFromMetallic(const float metallic)
 {
 	float oneMinusDielectricSpec = 1.0 - 0.220916301;
 	return oneMinusDielectricSpec - metallic * oneMinusDielectricSpec;
 }
 
 
-inline float3 DiffuseAndSpecularFromMetallic(float3 albedo, float metallic, float3& specColor, float& oneMinusReflectivity)
+inline float3 DiffuseAndSpecularFromMetallic(const float3 albedo, const float metallic, float3& specColor, float& oneMinusReflectivity)
 {
 	specColor = lerp(make_float3(0.220916301, 0.220916301, 0.220916301), albedo, metallic);
 	oneMinusReflectivity = OneMinusReflectivityFromMetallic(metallic);
 	return albedo * oneMinusReflectivity;
 }
 
-inline float SmoothnessToPerceptualRoughness(float smoothness)
+inline float SmoothnessToPerceptualRoughness(const float smoothness)
 {
 	return (1 - smoothness);
 }
 
-float DisneyDiffuse(float NdotV, float NdotL, float LdotH, float perceptualRoughness)
+float DisneyDiffuse(const float NdotV, const float NdotL, const float LdotH, const float perceptualRoughness)
 {
 	float fd90 = 0.5 + 2 * LdotH * LdotH * perceptualRoughness;
 	// Two schlick fresnel term
@@ -121,12 +120,12 @@ float DisneyDiffuse(float NdotV, float NdotL, float LdotH, float perceptualRough
 	return lightScatter * viewScatter;
 }
 
-inline float PerceptualRoughnessToRoughness(float perceptualRoughness)
+inline float PerceptualRoughnessToRoughness(const float perceptualRoughness)
 {
 	return perceptualRoughness * perceptualRoughness;
 }
 
-inline float SmithJointGGXVisibilityTerm(float NdotL, float NdotV, float roughness)
+inline float SmithJointGGXVisibilityTerm(const float NdotL, const float NdotV, const float roughness)
 {
 	// Approximation of the above formulation (simplify the sqrt, not mathematically correct but close enough)
 	float a = roughness;
@@ -140,7 +139,7 @@ inline float SmithJointGGXVisibilityTerm(float NdotL, float NdotV, float roughne
 #endif
 }
 
-inline float GGXTerm(float NdotH, float roughness)
+inline float GGXTerm(const float NdotH, const float roughness)
 {
 	float a2 = roughness * roughness;
 	float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
@@ -148,13 +147,13 @@ inline float GGXTerm(float NdotH, float roughness)
 										  // therefore epsilon is smaller than what can be represented by float
 }
 
-inline float3 FresnelTerm(float3 F0, float cosA)
+inline float3 FresnelTerm(const float3 F0, const float cosA)
 {
 	float t = Pow5(1 - cosA);   // ala Schlick interpoliation
 	return F0 + (1 - F0) * t;
 }
 
-inline float3 FresnelLerp(float3 F0, float3 F90, float cosA)
+inline float3 FresnelLerp(const float3 F0, const float3 F90, const float cosA)
 {
 	float t = Pow5(1 - cosA);   // ala Schlick interpoliation
 	return lerp(F0, F90, t);
@@ -213,7 +212,7 @@ float3 PBS(const SurfaceInfo IN, const float3 lightDir, const float3 lightSatu, 
 }
 
 
-inline void uniform_sample_hemisphere(float x, float y, float3& p) {
+inline void uniform_sample_hemisphere(const float x, const float y, float3& p) {
 	float Phi = 2 * M_PI * x;
 	float CosTheta = y;
 	float SinTheta = sqrt(1 - CosTheta * CosTheta);
@@ -223,7 +222,7 @@ inline void uniform_sample_hemisphere(float x, float y, float3& p) {
 	p.y = CosTheta;
 }
 
-inline float NDF(const float3& h, float roughness) {
+inline float NDF(const float3& h, const float roughness) {
 	float alpha = roughness * roughness;
 	float alpha2 = alpha * alpha;
 	float NoH = h.z;
@@ -231,22 +230,24 @@ inline float NDF(const float3& h, float roughness) {
 	return alpha2 / (M_PI * k * k);
 }
 
-void sample_GGX(float2 E, const float smoothness, float3 & n, float & pd) {
-
+void ImportanceSampleGGX(const float2 E, const float smoothness, float3 & n, float & pd) {
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
-	// 根据 NDF 采样 h
-	float Xi1 = E.x;
-	float Xi2 = E.y;
-	float alpha = roughness * roughness;
-	float cosTheta2 = (1 - Xi1) / (Xi1*(alpha*alpha - 1) + 1);	//float cosTheta2 = (1 - Xi1) / max((1 - a2 * Xi1), 0.001);
-	float cosTheta = sqrt(cosTheta2);
-	float sinTheta = sqrt(1 - cosTheta2);
-	float phi = 2 * M_PI * Xi2;
+	float m = roughness * roughness;
+	float m2 = m * m;
 
-	n = make_float3(sinTheta*cos(phi), sinTheta*sin(phi), cosTheta);
-	pd = min(NDF(n, roughness) / 4.0f,10.0f);
+	float Phi = 2 * M_PI * E.x;
+	float CosTheta = sqrt((1 - E.y) / (1 + (m2 - 1) * E.y));
+	float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+	n.x = SinTheta * cos(Phi);
+	n.y = SinTheta * sin(Phi);
+	n.z = CosTheta;
+
+	float d = (CosTheta * m2 - CosTheta) * CosTheta + 1;
+	float D = m2 / (M_PI * d * d);
+
+	pd = max(D * CosTheta, 12.f);
 }
-
 
 #endif // !PBS_H_

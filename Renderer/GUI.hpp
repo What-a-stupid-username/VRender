@@ -67,21 +67,13 @@ private:
 			SetFocus(GL_Window);
 		}
 
-
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-		//ImGui::ColorEdit4("clear color", (float*)&back_ground_color);
-		//if (ImGui::Button("Button"))
-		//	counter++;
-		//ImGui::SameLine();
-		//ImGui::Text("counter = %d", counter);
-
 		ImGui::End();
 	}
 
 	void DrawConsole() {
 		ImGui::Begin("Console", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(250,200));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300,240));
 
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
@@ -116,7 +108,7 @@ private:
 		static bool post = false;
 		if (layer.resultType != OptiXLayer::ResultBufferType::origial) {
 			if (post == false) layer.RebuildCommandList(true);
-			ImGui::SliderFloat("Exposure", &layer.exposure, 0, 100, "%.4f", 3);
+			ImGui::SliderFloatLableOnLeft("Exposure", &layer.exposure, 0, 100, "%.4f", 3);
 			post = true;
 			ImGui::Separator();
 		}
@@ -125,13 +117,15 @@ private:
 			post = false;
 		}
 
+		if (ImGui::SliderFloatLableOnLeft("Diffuse strength", &layer.diffuse_strength, 0, 10, "%.2f")) layer.MaskDirty();
+
 		ImGui::End();
 	}
 
 	void DrawSettings() {
 		ImGui::Begin("Settings", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(250, 120));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 120));
 		
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
@@ -149,7 +143,7 @@ private:
 		ImGui::Begin("Output", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(250, 130));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 130));
 
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();

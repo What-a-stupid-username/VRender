@@ -58,6 +58,7 @@ private:
 public:
 	bool pause = false;
 	float exposure = 3.f, gamma = 2.2f;
+	float diffuse_strength = 1;
 
 	enum ResultBufferType { origial, tonemap, denoise };
 	ResultBufferType resultType =  origial;
@@ -143,6 +144,8 @@ public:
 		w = layer.screenWidth;
 		h = layer.screenHeight;
 	}
+
+	inline void MaskDirty() { dirty = true;}
 
 	static void SaveResultToFile(string name);
 };

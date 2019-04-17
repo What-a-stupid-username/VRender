@@ -3,6 +3,9 @@
 #include <GUI.hpp>
 #include <thread>
 #include <shellapi.h>
+
+#include <Support/Material.h>
+
 using namespace std;
 
 int main(int argc, char** argv) {

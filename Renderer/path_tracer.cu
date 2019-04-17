@@ -1,33 +1,5 @@
-/* 
- * Copyright (c) 2018 NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include <optixu/optixu_math_namespace.h>
-#include "optixPathTracer.h"
+#include "DataBridge.h"
 #include "random.h"
 
 #include "PBS.h"
@@ -55,6 +27,13 @@ rtDeclareVariable(uint2,         launch_index, rtLaunchIndex, );
 rtDeclareVariable(PerRayData_pathtrace, current_prd, rtPayload, );
 
 
+rtDeclareVariable(unsigned int, common_ray_type, , );
+rtDeclareVariable(unsigned int, pathtrace_shadow_ray_type, , );
+
+
+rtDeclareVariable(unsigned int, rnd_seed, , );
+rtDeclareVariable(float, diffuse_strength, , ) = 1;
+
 
 //-----------------------------------------------------------------------------
 //
@@ -68,10 +47,7 @@ rtDeclareVariable(float3,        V, , );
 rtDeclareVariable(float3,        W, , );
 rtDeclareVariable(float3,        bad_color, , );
 rtDeclareVariable(unsigned int,  frame_number, , );
-rtDeclareVariable(unsigned int,  rnd_seed, , );
 rtDeclareVariable(unsigned int,  sqrt_num_samples, , );
-rtDeclareVariable(unsigned int,  common_ray_type, , );
-rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
@@ -114,7 +90,6 @@ RT_PROGRAM void pathtrace_camera()
 
 		float sat = 50;
 		result += make_float3(min(prd.radiance.x,sat), min(prd.radiance.y, sat), min(prd.radiance.z, sat));
-
 
     } while (--samples_per_pixel);
 
@@ -210,60 +185,64 @@ RT_PROGRAM void default_lit_closest_hit() //ray-type = 0(common_ray)
 
 		if (current_prd.depth < 6) 
 		{
+			optix::Onb onb(ffnormal);
 			{
 				float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
-				if (z1 < max_diffuse * transparent / 4) //透射部分
+				if (z1 < max_diffuse * transparent / (current_prd.depth + 2)) //透射部分
 				{
-					if (refract(p, ray.direction, ffnormal, in_to_out ? 1.0f / refraction_index : refraction_index)) {
+					float pd;
+					float3 n;
+					ImportanceSampleGGX(make_float2(z1, z2), IN.smoothness, n, pd); //修正毛玻璃
+					onb.inverse_transform(n);
+
+					if (refract(p, ray.direction, n, in_to_out ? 1.0f / refraction_index : refraction_index)) {
 						prd.countEmitted = false;
 
 						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 						rtTrace(top_object, next_ray, prd);
 
-						current_prd.radiance += prd.radiance * baseColor / max_diffuse * 4;
+						current_prd.radiance += prd.radiance * baseColor / max_diffuse * (current_prd.depth + 2);
 					}
 				}
-				if (!in_to_out) {
-					if (z2 < max_diffuse * (1 - transparent)) { //漫射部分
-						cosine_sample_hemisphere(z1, z2, p);
-						optix::Onb onb(ffnormal);
-						onb.inverse_transform(p);
+				if (z2 < max_diffuse * (2 * in_to_out * transparent + 1 - in_to_out - transparent)) { //漫射部分
+					cosine_sample_hemisphere(z1, z2, p);
+					onb.inverse_transform(p);
 
-						prd.countEmitted = false;
+					prd.countEmitted = false;
 
-						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
-						rtTrace(top_object, next_ray, prd);
-						current_prd.radiance += prd.radiance * baseColor / max_diffuse * M_1_PI;
-					}
+					rtTrace(top_object, next_ray, prd);
+					current_prd.radiance += prd.radiance * baseColor / max_diffuse * diffuse_strength;
 				}
 			}
 			if (z1 < 1.f / (current_prd.depth+3))
 			{// 反射部分
-				float pd = M_PI;
-				float3 n = make_float3(0,0,1);
+				float pd;
+				float3 n;
 				//uniform_sample_hemisphere(z1, z2, n);
-				sample_GGX(make_float2(z1, z2), IN.smoothness, n, pd);
-				if (pd != 0) {
-					optix::Onb onb(ffnormal);
-					onb.inverse_transform(n);
-					p = reflect(ray.direction, n);
+				if (z1 > 1 || z2 > 1 || z1 < 0 || z2 < 0) {
+					current_prd.radiance = make_float3(10000, 0, 10000); return;
+				}
+				ImportanceSampleGGX(make_float2(z1, z2), IN.smoothness, n, pd);
 
-					if (dot(p, ffnormal) > 0) {
-						prd.countEmitted = false;
+				onb.inverse_transform(n);
+				p = reflect(ray.direction, n);
 
-						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+				if (dot(p, ffnormal) > 0) {
+					prd.countEmitted = false;
 
-						rtTrace(top_object, next_ray, prd);
+					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
-						current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth+3) / pd;
-					}
+					rtTrace(top_object, next_ray, prd);
+
+					current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth + 3) / pd;
 				}
 			}
 		}
 	}
-	
+
 	if (z1 > 1.f / (current_prd.depth + 1)) return;
 
 	unsigned int num_lights = lights.size();

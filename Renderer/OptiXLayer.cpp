@@ -280,7 +280,7 @@ void OptiXLayer::LoadScene() {
 			make_float3(556.0f, 0.0f, 0.0f),
 			make_float3(0.0f, 0.0f, 559.2f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
+		//setMaterial(gis.back(), default_lit, "metallic", 1.f);
 
 		// Back wall
 		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 559.2f),
@@ -307,26 +307,31 @@ void OptiXLayer::LoadScene() {
 			make_float3(160.0f, 0.0f, 49.0f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
 		setMaterial(gis.back(), default_lit, "transparent", 1);
+		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
 		gis.push_back(createParallelogram(context, make_float3(290.0f, 0.0f, 114.0f),
 			make_float3(0.0f, 165.0f, 0.0f),
 			make_float3(-50.0f, 0.0f, 158.0f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
 		setMaterial(gis.back(), default_lit, "transparent", 1);
+		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
 		gis.push_back(createParallelogram(context, make_float3(130.0f, 0.0f, 65.0f),
 			make_float3(0.0f, 165.0f, 0.0f),
 			make_float3(160.0f, 0.0f, 49.0f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
 		setMaterial(gis.back(), default_lit, "transparent", 1);
+		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
 		gis.push_back(createParallelogram(context, make_float3(82.0f, 0.0f, 225.0f),
 			make_float3(0.0f, 165.0f, 0.0f),
 			make_float3(48.0f, 0.0f, -160.0f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
 		setMaterial(gis.back(), default_lit, "transparent", 1);
+		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
 		gis.push_back(createParallelogram(context, make_float3(240.0f, 0.0f, 272.0f),
 			make_float3(0.0f, 165.0f, 0.0f),
 			make_float3(-158.0f, 0.0f, -47.0f)));
 		setMaterial(gis.back(), default_lit, "albedo", white);
 		setMaterial(gis.back(), default_lit, "transparent", 1);
+		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
 
 		// Tall block
 		gis.push_back(createParallelogram(context, make_float3(423.0f, 330.0f, 247.0f),
@@ -397,13 +402,14 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 		layer.context->validate();
 		layer.cb->validate();
 
-		layer.context["rnd_seed"]->setUint(rand() % 999);
+		layer.context["rnd_seed"]->setUint(rand());
+		layer.context["diffuse_strength"]->setFloat(layer.diffuse_strength);
 		Variable(layer.tonemapStage->queryVariable("exposure"))->setFloat(layer.exposure);
 
-		auto length_buffer = layer.context["length_buffer"]->getBuffer();
-		auto length = (int*)length_buffer->map();
-		length[0] = 0; length[1] = 0; length[2] = 0;
-		length_buffer->unmap();
+		//auto length_buffer = layer.context["length_buffer"]->getBuffer();
+		//auto length = (int*)length_buffer->map();
+		//length[0] = 0; length[1] = 0; length[2] = 0;
+		//length_buffer->unmap();
 
 		layer.dirty = false;
 		layer.cb->execute();

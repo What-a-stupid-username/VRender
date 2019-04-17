@@ -2507,6 +2507,12 @@ bool ImGui::SliderScalarN(const char* label, ImGuiDataType data_type, void* v, i
     return value_changed;
 }
 
+bool ImGui::SliderFloatLableOnLeft(const char* label, float* v, float v_min, float v_max, const char* format, float power)
+{
+	ImGui::Text(label); ImGui::SameLine();
+	return ImGui::SliderFloat("", v, v_min, v_max, format, power);
+}
+
 bool ImGui::SliderFloat(const char* label, float* v, float v_min, float v_max, const char* format, float power)
 {
     return SliderScalar(label, ImGuiDataType_Float, v, &v_min, &v_max, format, power);

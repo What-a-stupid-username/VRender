@@ -1,16 +1,10 @@
-cmake_minimum_required(VERSION 2.8.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
-cmake_policy(VERSION 2.6)
+cmake_policy(VERSION 3.10)
 
 
 project(VRenderer)
 
-#set(CMAKE_AUTOMOC ON)
-#set(CMAKE_AUTOUIC ON)
-
-#SET(QT_USE_QTOPENGL TRUE)
-
-#find_package(Qt5 COMPONENTS Widgets OpenGL)
 
 # Add paths to our CMake code to the module path, so they can be found automatically by
 # CMake.
@@ -271,7 +265,6 @@ add_subdirectory(Imgui)
 INCLUDE_DIRECTORIES(Imgui_INCLUDE_DIR)
 
 add_subdirectory(Renderer)
-
 
 
 add_subdirectory(sutil)
