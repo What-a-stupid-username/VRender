@@ -5,12 +5,12 @@ cmake_policy(VERSION 2.6)
 
 project(VRenderer)
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
+#set(CMAKE_AUTOMOC ON)
+#set(CMAKE_AUTOUIC ON)
 
-SET(QT_USE_QTOPENGL TRUE)
+#SET(QT_USE_QTOPENGL TRUE)
 
-find_package(Qt5 COMPONENTS Widgets OpenGL)
+#find_package(Qt5 COMPONENTS Widgets OpenGL)
 
 # Add paths to our CMake code to the module path, so they can be found automatically by
 # CMake.
@@ -244,9 +244,9 @@ function(add_sample_executable target_name)
     sutil_sdk
     optix
     ${optix_rpath}
-    Qt5::Widgets
-    Qt5::OpenGL
-	Imgui
+    #Qt5::Widgets
+    #Qt5::OpenGL
+	  Imgui
     )
 	
   add_dependencies(${target_name} Imgui)

@@ -124,9 +124,9 @@ void OptiXLayer::Init() {
 		context = Context::create();
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
-		context->setStackSize(3600);
-		//context->setMaxCallableProgramDepth(9);
-		context->setMaxTraceDepth(9);
+		context->setStackSize(2000);
+		//context->setMaxTraceDepth(9);//only work with optix6.0.0+, if you get an error here, just commented out this
+
 
 		context["scene_epsilon"]->setFloat(1.e-3f);
 		context["common_ray_type"]->setUint(0u);

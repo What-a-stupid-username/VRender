@@ -1,0 +1,41 @@
+[33mcommit 6ce67715fd286c5c5cba43d4bbab6c5560313224[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: hjk <568246876@qq.com>
+Date:   Wed Apr 17 10:51:45 2019 +0800
+
+    add ui
+
+[33mcommit 1d53fe689218345238b588e45731f7ba09b7999c[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Mon Apr 15 20:59:33 2019 +0800
+
+    .
+
+[33mcommit 6231547074ae77b3bc8d838ccc6429cb7e2fe8b4[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Mon Feb 25 17:46:52 2019 +0800
+
+    update cuda thrust test
+
+[33mcommit 20540112ec81b7806cbc17d31c15dc5736317796[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Tue Feb 19 17:49:03 2019 +0800
+
+    test thrust
+
+[33mcommit 909f69e357beddf262347924505254fd6ed7ba51[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Tue Feb 19 17:46:19 2019 +0800
+
+    first commit
+
+[33mcommit 82962211099ad3d2169d1d759db54ed6d2daca0f[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Tue Feb 19 17:43:46 2019 +0800
+
+    Update .gitignore
+
+[33mcommit 49092c5458ee7a468c151aae5abbdfe2f18becb5[m
+Author: What-a-stupid-username <568246876@qq.com>
+Date:   Tue Feb 19 17:42:20 2019 +0800
+
+    Initial commit

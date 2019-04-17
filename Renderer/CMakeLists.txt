@@ -13,14 +13,6 @@ add_sample_executable(Renderer
 	OptiXLayer.cpp
 	VDebug.h
 	GUI.hpp
-
-
-    glviewer.h
-    glviewer.cpp
-    vector_widget.h
-    vector_widget.cpp
-    transform_widget.h
-    transform_widget.cpp
 )
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
