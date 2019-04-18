@@ -69,6 +69,7 @@ private:
 		//Init();
 	}
 
+	function<void(Context&)> load_scene_func;
 
 	OptiXLayer(const OptiXLayer&) abandon;
 	OptiXLayer& operator=(const OptiXLayer&) abandon;
@@ -106,7 +107,7 @@ public:
 	}
 
 
-	inline const static Context Context() {
+	inline static Context Context() {
 		return Instance().context;
 	}
 
@@ -148,4 +149,6 @@ public:
 	inline void MaskDirty() { dirty = true;}
 
 	static void SaveResultToFile(string name);
+
+	static void SetLoadSceneFunction(function<void(optix::Context&)> func) { Instance().load_scene_func = func; }
 };

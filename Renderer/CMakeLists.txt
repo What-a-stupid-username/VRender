@@ -7,8 +7,6 @@ add_sample_executable(Renderer
 
     main.cpp
 
-    DataBridge.h
-
 	OptiXLayer.h
 	OptiXLayer.cpp
 	

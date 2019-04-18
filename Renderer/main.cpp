@@ -9,6 +9,9 @@
 using namespace std;
 
 int main(int argc, char** argv) {
+	OptiXLayer::LazyInit();
+
+	auto mat = VMaterial::Find("default");
 	//HWND hwnd;
 	//hwnd = FindWindow("ConsoleWindowClass", NULL);
 	//if (hwnd)
@@ -23,7 +26,6 @@ int main(int argc, char** argv) {
 
 			glewInit();
 
-			OptiXLayer::LazyInit();
 			OptiXLayer::LoadScene();
 
 			glutRun();

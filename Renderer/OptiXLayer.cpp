@@ -1,5 +1,5 @@
 #include "OptiXLayer.h"
-
+#include "Support/Material.h"
 
 Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
@@ -125,7 +125,7 @@ void OptiXLayer::Init() {
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
 		context->setStackSize(2000);
-		//context->setMaxTraceDepth(9);//only work with optix6.0.0+, if you get an error here, just commented out this
+		context->setMaxTraceDepth(7);//only work with optix6.0.0+, if you get an error here, just commented out this
 
 
 		context["scene_epsilon"]->setFloat(1.e-3f);
@@ -159,12 +159,12 @@ void OptiXLayer::Init() {
 		//context["photon_sorted_pointer_buffer"]->set(photon_sorted_pointer_buffer);
 
 		// Setup programs
-		const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
-		context->setRayGenerationProgram(0, context->createProgramFromPTXString(ptx, "pathtrace_camera"));
+		const char *ptx = sutil::getPtxString("Shaders", "path_tracer_camera.cu");
+		context->setRayGenerationProgram(0, context->createProgramFromPTXString(ptx, "path_tracer_camera"));
 		context->setExceptionProgram(0, context->createProgramFromPTXString(ptx, "exception"));
 		context->setMissProgram(0, context->createProgramFromPTXString(ptx, "miss"));
 
-		ptx = sutil::getPtxString("Renderer", "photon_map.cu");
+		ptx = sutil::getPtxString("Shaders", "photon_map.cu");
 		context->setRayGenerationProgram(1, context->createProgramFromPTXString(ptx, "emmit"));
 		context->setExceptionProgram(1, context->createProgramFromPTXString(ptx, "exception"));
 		context->setMissProgram(1, context->createProgramFromPTXString(ptx, "miss"));
@@ -230,38 +230,6 @@ void OptiXLayer::LoadScene() {
 		context["lights"]->setBuffer(light_buffer);
 
 
-		// Set up material
-		Material default_lit = context->createMaterial();
-		{
-			const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
-			Program default_lit_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_closest_hit");
-			Program default_lit_any_hit = context->createProgramFromPTXString(ptx, "default_lit_any_hit");
-			ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-			Program default_lit_photon_closest_hit = context->createProgramFromPTXString(ptx, "default_lit_photon_closest_hit");
-			default_lit->setClosestHitProgram(0, default_lit_closest_hit);
-			default_lit->setAnyHitProgram(1, default_lit_any_hit);
-			default_lit->setClosestHitProgram(2, default_lit_photon_closest_hit);
-		}
-
-
-		Material default_light = context->createMaterial();
-		{
-			const char *ptx = sutil::getPtxString("Renderer", "path_tracer.cu");
-			Program default_light_closest_hit = context->createProgramFromPTXString(ptx, "default_light_closest_hit");
-			ptx = sutil::getPtxString("Renderer", "photon_map.cu");
-			Program default_light_any_hit = context->createProgramFromPTXString(ptx, "light_ignore_photon_hit");
-			default_light->setClosestHitProgram(0, default_light_closest_hit);
-			default_light->setAnyHitProgram(2, default_light_any_hit);
-		}
-
-		{
-			// Set up parallelogram programs
-			const char *ptx = sutil::getPtxString("Renderer", "parallelogram.cu");
-			pgram_bounding_box = context->createProgramFromPTXString(ptx, "bounds");
-			pgram_intersection = context->createProgramFromPTXString(ptx, "intersect");
-		}
-
-
 		// create geometry instances
 		std::vector<GeometryInstance> gis;
 
@@ -269,123 +237,64 @@ void OptiXLayer::LoadScene() {
 		const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
 		const float3 red = make_float3(0.8f, 0.05f, 0.05f);
 
+		class Foo {
+		public:
+			static VObject* foo(float3& anchor, float3& offset1, float3& offset2, string material = "default") {
+				VObject* obj = new VObject("parallelogram");
+
+				float3 normal = normalize(cross(offset1, offset2));
+				float d = dot(normal, anchor);
+				float4 plane = make_float4(normal, d);
+
+				float3 v1 = offset1 / dot(offset1, offset1);
+				float3 v2 = offset2 / dot(offset2, offset2);
+
+				obj->GeometryFilter()->Visit("plane")->setFloat(plane);
+				obj->GeometryFilter()->Visit("anchor")->setFloat(anchor);
+				obj->GeometryFilter()->Visit("v1")->setFloat(v1);
+				obj->GeometryFilter()->Visit("v2")->setFloat(v2);
+
+				obj->SetMaterial(VMaterial::Find(material));
+				return obj;
+			}
+		};
 		// Floor
-		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
-			make_float3(0.0f, 0.0f, 559.2f),
-			make_float3(556.0f, 0.0f, 0.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-
+		Foo::foo(make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), make_float3(556.0f, 0.0f, 0.0f));
 		// Ceiling
-		gis.push_back(createParallelogram(context, make_float3(0.0f, 548.8f, 0.0f),
-			make_float3(556.0f, 0.0f, 0.0f),
-			make_float3(0.0f, 0.0f, 559.2f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		//setMaterial(gis.back(), default_lit, "metallic", 1.f);
-
+		Foo::foo(make_float3(0.0f, 548.8f, 0.0f), make_float3(556.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f));
 		// Back wall
-		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 559.2f),
-			make_float3(0.0f, 548.8f, 0.0f),
-			make_float3(556.0f, 0.0f, 0.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
-
+		Foo::foo(make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), make_float3(556.0f, 0.0f, 0.0f), "default_feb");
 		// Right wall
-		gis.push_back(createParallelogram(context, make_float3(0.0f, 0.0f, 0.0f),
-			make_float3(0.0f, 548.8f, 0.0f),
-			make_float3(0.0f, 0.0f, 559.2f)));
-		setMaterial(gis.back(), default_lit, "albedo", blue);
-
+		Foo::foo(make_float3(1.0f, 0.0f, 0.0f), make_float3(0.0f, 548.8f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), "default_blue");
 		// Left wall
-		gis.push_back(createParallelogram(context, make_float3(556.0f, 0.0f, 0.0f),
-			make_float3(0.0f, 0.0f, 559.2f),
-			make_float3(0.0f, 548.8f, 0.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", red);
-
+		Foo::foo(make_float3(556.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), "default_red");
 		// Short block
-		gis.push_back(createParallelogram(context, make_float3(130.0f, 165.0f, 65.0f),
-			make_float3(-48.0f, 0.0f, 160.0f),
-			make_float3(160.0f, 0.0f, 49.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "transparent", 1);
-		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
-		gis.push_back(createParallelogram(context, make_float3(290.0f, 0.0f, 114.0f),
-			make_float3(0.0f, 165.0f, 0.0f),
-			make_float3(-50.0f, 0.0f, 158.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "transparent", 1);
-		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
-		gis.push_back(createParallelogram(context, make_float3(130.0f, 0.0f, 65.0f),
-			make_float3(0.0f, 165.0f, 0.0f),
-			make_float3(160.0f, 0.0f, 49.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "transparent", 1);
-		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
-		gis.push_back(createParallelogram(context, make_float3(82.0f, 0.0f, 225.0f),
-			make_float3(0.0f, 165.0f, 0.0f),
-			make_float3(48.0f, 0.0f, -160.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "transparent", 1);
-		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
-		gis.push_back(createParallelogram(context, make_float3(240.0f, 0.0f, 272.0f),
-			make_float3(0.0f, 165.0f, 0.0f),
-			make_float3(-158.0f, 0.0f, -47.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "transparent", 1);
-		setMaterial(gis.back(), default_lit, "smoothness", 0.2f);
+		Foo::foo(make_float3(130.0f, 165.0f, 65.0f), make_float3(-48.0f, 0.0f, 160.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
+		Foo::foo(make_float3(290.0f, 0.0f, 114.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-50.0f, 0.0f, 158.0f), "default_transparent");
+		Foo::foo(make_float3(130.0f, 0.0f, 65.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
+		Foo::foo(make_float3(82.0f, 0.0f, 225.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(48.0f, 0.0f, -160.0f), "default_transparent");;
+		Foo::foo(make_float3(240.0f, 0.0f, 272.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-158.0f, 0.0f, -47.0f), "default_transparent");
 
-		// Tall block
-		gis.push_back(createParallelogram(context, make_float3(423.0f, 330.0f, 247.0f),
-			make_float3(-158.0f, 0.0f, 49.0f),
-			make_float3(49.0f, 0.0f, 159.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
-		gis.push_back(createParallelogram(context, make_float3(423.0f, 0.0f, 247.0f),
-			make_float3(0.0f, 330.0f, 0.0f),
-			make_float3(49.0f, 0.0f, 159.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
-		gis.push_back(createParallelogram(context, make_float3(472.0f, 0.0f, 406.0f),
-			make_float3(0.0f, 330.0f, 0.0f),
-			make_float3(-158.0f, 0.0f, 50.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
-		gis.push_back(createParallelogram(context, make_float3(314.0f, 0.0f, 456.0f),
-			make_float3(0.0f, 330.0f, 0.0f),
-			make_float3(-49.0f, 0.0f, -160.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
-		gis.push_back(createParallelogram(context, make_float3(265.0f, 0.0f, 296.0f),
-			make_float3(0.0f, 330.0f, 0.0f),
-			make_float3(158.0f, 0.0f, -49.0f)));
-		setMaterial(gis.back(), default_lit, "albedo", white);
-		setMaterial(gis.back(), default_lit, "metallic", 1.f);
-		setMaterial(gis.back(), default_lit, "smoothness", 1.f);
+		//// Tall block
+		Foo::foo(make_float3(423.0f, 330.0f, 247.0f), make_float3(-158.0f, 0.0f, 49.0f), make_float3(49.0f, 0.0f, 159.0f), "default_mirror");
+		Foo::foo(make_float3(423.0f, 0.0f, 247.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(49.0f, 0.0f, 159.0f), "default_mirror");
+		Foo::foo(make_float3(472.0f, 0.0f, 406.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(-158.0f, 0.0f, 50.0f), "default_mirror");
+		Foo::foo(make_float3(314.0f, 0.0f, 456.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(-49.0f, 0.0f, -160.0f), "default_mirror");
+		Foo::foo(make_float3(265.0f, 0.0f, 296.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(158.0f, 0.0f, -49.0f), "default_mirror");
 
-		// Create shadow group (no light)
-		GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
-		shadow_group->setAcceleration(context->createAcceleration("Trbvh"));
-		context["top_shadower"]->set(shadow_group);
+		//Light
+		Foo::foo(make_float3(343.0f, 548.6f, 227.0f), make_float3(0.0f, 0.0f, 105.0f), make_float3(-130.0f, 0.0f, 0.0f), "light");
 
-		// Light
-		gis.push_back(createParallelogram(context, make_float3(343.0f, 548.6f, 227.0f),
-			make_float3(0.0f, 0.0f, 105.0f),
-			make_float3(-130.0f, 0.0f, 0.0f)));
-		setMaterial(gis.back(), default_light, "emission_color", light_em);
+		context["top_shadower"]->set(VTransform::Root()->Group());
 
-		// Create geometry group
-		GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
-		geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
-		context["top_object"]->set(geometry_group);
+
+		context["top_object"]->set(VTransform::Root()->Group());
 
 		Instance().dirty = true;
 	}
-	catch (const std::exception&)
+	catch (const Exception& e)
 	{
-
+		cout << e.getErrorString() << endl;
 		Instance().rendering.unlock();
 		return;
 	}	
@@ -412,6 +321,8 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 		//length_buffer->unmap();
 
 		layer.dirty = false;
+
+		VMaterial::ApllyAllChanges();
 		layer.cb->execute();
 	}
 	catch (Exception& e) {

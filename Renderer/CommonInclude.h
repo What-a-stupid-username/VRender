@@ -15,7 +15,7 @@
 #include <optixu/optixpp_namespace.h>
 #include <optixu/optixu_math_stream_namespace.h>
 
-#include "DataBridge.h"
+#include "../cuda/DataBridge.h"
 #include <sutil.h>
 #include <Arcball.h>
 

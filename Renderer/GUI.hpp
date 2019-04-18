@@ -108,7 +108,7 @@ private:
 		static bool post = false;
 		if (layer.resultType != OptiXLayer::ResultBufferType::origial) {
 			if (post == false) layer.RebuildCommandList(true);
-			ImGui::SliderFloatLableOnLeft("Exposure", &layer.exposure, 0, 100, "%.4f", 3);
+			ImGui::SliderFloatLableOnLeft("Exposure", " ", &layer.exposure, 0, 100, "%.4f", 3);
 			post = true;
 			ImGui::Separator();
 		}
@@ -116,8 +116,10 @@ private:
 			if (post == true) layer.RebuildCommandList(false);
 			post = false;
 		}
-
-		if (ImGui::SliderFloatLableOnLeft("Diffuse strength", &layer.diffuse_strength, 0, 10, "%.2f")) layer.MaskDirty();
+		{
+			bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
+			if (k) layer.MaskDirty();
+		}
 
 		ImGui::End();
 	}
