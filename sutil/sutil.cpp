@@ -500,6 +500,165 @@ void sutil::displayBufferPPM( const char* filename, Buffer buffer, bool disable_
     displayBufferPPM( filename, buffer->get(), disable_srgb_conversion );
 }
 
+void write_bmpheader(unsigned char *bitmap, int offset, int bytes, int value) {
+	int i;
+	for (i = 0; i < bytes; i++)
+		bitmap[offset + i] = (value >> (i << 3)) & 0xFF;
+}
+
+int SaveBMP(unsigned char *image, int imageWidth, int imageHeight, const char *filename)
+{
+	unsigned char header[54] = {
+		0x42, 0x4d, 0, 0, 0, 0, 0, 0, 0, 0,
+		54, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 32, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0
+	};
+
+	long file_size = (long)imageWidth * (long)imageHeight * 4 + 54;
+	header[2] = (unsigned char)(file_size & 0x000000ff);
+	header[3] = (file_size >> 8) & 0x000000ff;
+	header[4] = (file_size >> 16) & 0x000000ff;
+	header[5] = (file_size >> 24) & 0x000000ff;
+
+	long width = imageWidth;
+	header[18] = width & 0x000000ff;
+	header[19] = (width >> 8) & 0x000000ff;
+	header[20] = (width >> 16) & 0x000000ff;
+	header[21] = (width >> 24) & 0x000000ff;
+
+	long height = imageHeight;
+	header[22] = height & 0x000000ff;
+	header[23] = (height >> 8) & 0x000000ff;
+	header[24] = (height >> 16) & 0x000000ff;
+	header[25] = (height >> 24) & 0x000000ff;
+
+	char fname_bmp[128];
+	sprintf(fname_bmp, "%s.bmp", filename);
+
+	FILE *fp;
+	if (!(fp = fopen(fname_bmp, "wb")))
+		return -1;
+
+	fwrite(header, sizeof(unsigned char), 54, fp);
+	fwrite(image, sizeof(unsigned char), (size_t)(long)imageWidth * imageHeight * 4, fp);
+
+	fclose(fp);
+	return 0;
+}
+
+
+
+
+void sutil::displayBufferBMP(const char* filename, optix::Buffer buffer, bool disable_srgb_conversion) {
+	auto rtbuffer = buffer->get();
+	GLsizei width, height;
+	RTsize buffer_width, buffer_height;
+
+	GLvoid* imageData;
+	RT_CHECK_ERROR(rtBufferMap(rtbuffer, &imageData));
+
+	RT_CHECK_ERROR(rtBufferGetSize2D(rtbuffer, &buffer_width, &buffer_height));
+	width = static_cast<GLsizei>(buffer_width);
+	height = static_cast<GLsizei>(buffer_height);
+
+	std::vector<unsigned char> pix(width * height * 4);
+
+	RTformat buffer_format;
+	RT_CHECK_ERROR(rtBufferGetFormat(rtbuffer, &buffer_format));
+
+	const float gamma_inv = 1.0f / 2.2f;
+
+	switch (buffer_format) {
+	case RT_FORMAT_UNSIGNED_BYTE4:
+		// Data is BGRA and upside down, so we need to swizzle to RGB
+		for (int j = height - 1; j >= 0; --j) {
+			unsigned char *dst = &pix[0] + (3 * width*(height - 1 - j));
+			unsigned char *src = ((unsigned char*)imageData) + (4 * width*j);
+			for (int i = 0; i < width; i++) {
+				*dst++ = *(src + 2);
+				*dst++ = *(src + 1);
+				*dst++ = *(src + 0);
+				src += 4;
+			}
+		}
+		break;
+
+	case RT_FORMAT_FLOAT:
+		// This buffer is upside down
+		for (int j = height - 1; j >= 0; --j) {
+			unsigned char *dst = &pix[0] + width * (height - 1 - j);
+			float* src = ((float*)imageData) + (3 * width*j);
+			for (int i = 0; i < width; i++) {
+				int P;
+				if (disable_srgb_conversion)
+					P = static_cast<int>((*src++) * 255.0f);
+				else
+					P = static_cast<int>(std::pow(*src++, gamma_inv) * 255.0f);
+				unsigned int Clamped = P < 0 ? 0 : P > 0xff ? 0xff : P;
+
+				// write the pixel to all 3 channels
+				*dst++ = static_cast<unsigned char>(Clamped);
+				*dst++ = static_cast<unsigned char>(Clamped);
+				*dst++ = static_cast<unsigned char>(Clamped);
+			}
+		}
+		break;
+
+	case RT_FORMAT_FLOAT3:
+		// This buffer is upside down
+		for (int j = height - 1; j >= 0; --j) {
+			unsigned char *dst = &pix[0] + (3 * width*(height - 1 - j));
+			float* src = ((float*)imageData) + (3 * width*j);
+			for (int i = 0; i < width; i++) {
+				for (int elem = 0; elem < 3; ++elem) {
+					int P;
+					if (disable_srgb_conversion)
+						P = static_cast<int>((*src++) * 255.0f);
+					else
+						P = static_cast<int>(std::pow(*src++, gamma_inv) * 255.0f);
+					unsigned int Clamped = P < 0 ? 0 : P > 0xff ? 0xff : P;
+					*dst++ = static_cast<unsigned char>(Clamped);
+				}
+			}
+		}
+		break;
+
+	case RT_FORMAT_FLOAT4:
+		// This buffer is upside down
+		for (int j = 0; j <= height - 1; ++j) {
+			unsigned char *dst = &pix[0] + (4 * width*j);
+			float* src = ((float*)imageData) + (4 * width*j);
+			for (int i = 0; i < width; i++) {
+				for (int elem = 0; elem < 4; ++elem) {
+					int P;
+					if (disable_srgb_conversion)
+						P = static_cast<int>((*src++) * 255.0f);
+					else
+						P = static_cast<int>(std::pow(*src++, gamma_inv) * 255.0f);
+					unsigned int Clamped = P < 0 ? 0 : P > 0xff ? 0xff : P;
+					*dst++ = static_cast<unsigned char>(Clamped);
+				}
+
+				// skip alpha
+				//src++;
+			}
+		}
+		break;
+
+	default:
+		fprintf(stderr, "Unrecognized buffer data type or format.\n");
+		exit(2);
+		break;
+	}
+
+	SaveBMP(&pix[0], height, width, filename);
+	//SavePPM(&pix[0], filename, width, height, 3);
+
+
+	// Now unmap the buffer
+	RT_CHECK_ERROR(rtBufferUnmap(rtbuffer));
+}
 
 void sutil::displayBufferPPM( const char* filename, RTbuffer buffer, bool disable_srgb_conversion)
 {

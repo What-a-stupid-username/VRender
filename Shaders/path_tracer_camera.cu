@@ -12,7 +12,8 @@ rtDeclareVariable(float3,        V, , );
 rtDeclareVariable(float3,        W, , );
 rtDeclareVariable(float3,        bad_color, , );
 rtDeclareVariable(unsigned int,  frame_number, , );
-rtDeclareVariable(unsigned int,  sqrt_num_samples, , );
+rtDeclareVariable(unsigned int, sqrt_num_samples, , );
+rtDeclareVariable(unsigned int, cut_off_high_variance_result, , );
 
 
 RT_PROGRAM void path_tracer_camera()
@@ -50,8 +51,13 @@ RT_PROGRAM void path_tracer_camera()
         Ray ray = make_Ray(ray_origin, ray_direction, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
-		float sat = 50;
-		result += make_float3(min(prd.radiance.x,sat), min(prd.radiance.y, sat), min(prd.radiance.z, sat));
+		if (cut_off_high_variance_result) {
+			float sat = 50;
+			result += make_float3(min(prd.radiance.x, sat), min(prd.radiance.y, sat), min(prd.radiance.z, sat));
+		}
+		else {
+			result += prd.radiance;
+		}
 
     } while (--samples_per_pixel);
 

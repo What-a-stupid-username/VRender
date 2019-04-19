@@ -2,7 +2,9 @@
 #define GUI_HPP_
 
 #include <GlutEvent.h>
+#include <Support/Components.h>
 
+#include <shellapi.h>
 #include <dwmapi.h>
 #include "Imgui/imgui.h"
 #include "Imgui/imgui_impl_win32.h"
@@ -16,10 +18,12 @@ class VGUI {
 	OptiXLayer& layer;
 
 	bool show_setting_window = false;
-	bool show_console_window = false;
+	bool show_console_window = true;
 	bool show_output_window = false;
+	bool show_material_window = false;
 
 	ImVec2 next_Window_pos;
+	ImVec2 next_Window_pos_2;
 
 	int auto_resize = 2;
 
@@ -29,6 +33,17 @@ public:
 
 
 private:
+	void OpenMaterialFile(string name) {
+		string str = ((string(sutil::samplesDir()) + "/Materials/" + name + ".txt").c_str());
+		auto k = ShellExecute(DX_Window, "open", str.c_str(), NULL, NULL, SW_SHOW);
+		//thread([name]() {cout << ; }).detach();d
+	}
+
+	void LeftLabelText(string label, string txt) {
+		ImGui::Text(label.c_str()); ImGui::SameLine();
+		ImGui::Text(txt.c_str());
+	}
+
 	void DrawMainMenu() {
 		static float f = 0.0f;
 		static int counter = 0;
@@ -37,8 +52,9 @@ private:
 										ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
 										ImGuiWindowFlags_::ImGuiWindowFlags_NoResize);
 		ImGui::SetWindowPos(ImVec2(0, 0));
-		ImGui::SetWindowSize(ImVec2(250, 180));
+		ImGui::SetWindowSize(ImVec2(200, 240));
 		next_Window_pos = ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowWidth(), 0);
+		next_Window_pos_2 = next_Window_pos;
 		needed_size = ImGui::GetWindowSize();
 
 		static float fps = 0;
@@ -60,24 +76,26 @@ private:
 		ImGui::Checkbox("Open Console", &show_console_window);
 		ImGui::Checkbox("Open Setting Window", &show_setting_window);
 		ImGui::Checkbox("Open Output Window", &show_output_window);
-		ImGui::Separator();
+		ImGui::Checkbox("Open Material Window", &show_material_window);
+		//ImGui::Separator();
 
-		if (ImGui::Button("Focuse Renderer window")) {
-			SetForegroundWindow(GL_Window);
-			SetFocus(GL_Window);
-		}
+		//if (ImGui::Button("Focuse Renderer window")) {
+		//	SetForegroundWindow(GL_Window);
+		//	SetFocus(GL_Window);
+		//}
 
 		ImGui::End();
 	}
 
 	void DrawConsole() {
-		ImGui::Begin("Console", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::Begin("Console", &show_console_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
 		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300,240));
 
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
 		
 		if (layer.pause) {
 			if (ImGui::Button("Continue Renderer")) layer.pause = false;
@@ -105,33 +123,49 @@ private:
 
 		ImGui::Separator();
 
+		{
+			bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
+			if (k) layer.MarkDirty();
+		}
+
 		static bool post = false;
 		if (layer.resultType != OptiXLayer::ResultBufferType::origial) {
 			if (post == false) layer.RebuildCommandList(true);
-			ImGui::SliderFloatLableOnLeft("Exposure", " ", &layer.exposure, 0, 100, "%.4f", 3);
+			ImGui::SliderFloatLableOnLeft("Exposure", "###1", &layer.exposure, 0, 100, "%.4f", 3);
 			post = true;
-			ImGui::Separator();
 		}
 		else {
 			if (post == true) layer.RebuildCommandList(false);
 			post = false;
 		}
+
+		ImGui::Separator();
+
 		{
-			bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
-			if (k) layer.MaskDirty();
+			bool k = ImGui::SliderInt("###2", &layer.max_depth, 0, 10, "max tracing depth = %d");
+			if (k) layer.MarkDirty();
 		}
+
+		{
+			int sample_num_per_pixel = layer.sqrt_num_samples * layer.sqrt_num_samples;
+			ImGui::SliderInt("###3", &sample_num_per_pixel, 1, 16, "sample num per pixel = %d");
+			layer.sqrt_num_samples = sqrt(sample_num_per_pixel);
+		}
+
+		ImGui::Checkbox("Cut off high varient result", &layer.cut_off_high_variance_result);
 
 		ImGui::End();
 	}
 
 	void DrawSettings() {
-		ImGui::Begin("Settings", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::Begin("Settings", &show_setting_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
 		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 120));
 		
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
 
 		bool auto_resize_b = auto_resize != 2;
 		ImGui::Checkbox("Auto resize", &auto_resize_b);
@@ -142,22 +176,74 @@ private:
 	}
 
 	void DrawOutput() {
-		ImGui::Begin("Output", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::Begin("Output", &show_output_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 130));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 100));
 
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
+		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
+
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
 
-		string name = "VRenderer Output";
-		ImGui::InputText("Output name: ", &name[0], name.size()+1, ImGuiInputTextFlags_::ImGuiInputTextFlags_NoHorizontalScroll);
+		static string name = "VRenderer Output";
+		ImGui::InputText("Output name", &name[0], name.size()+1, ImGuiInputTextFlags_::ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll);
 
 		if (ImGui::Button("Save")) {
-			thread([&]() {layer.SaveResultToFile("name"); }).detach();			
+			thread([&]() { layer.SaveResultToFile(name + ".bmp"); }).detach();
 		}
 		
+		ImGui::End();
+	}
+
+	void DrawMaterial() {
+		ImGui::Begin("Material", &show_material_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+
+		ImGui::SetWindowPos(next_Window_pos_2);
+
+		auto mat_table = VMaterial::GetAllMaterials();
+
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, 200 * min(mat_table.size(), 3)));
+
+		next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+
+		int index = 0;
+		for each (auto mat in mat_table)
+		{
+			ImGui::Text(mat.first.c_str());
+			if (ImGui::Button(("Open File###" + to_string(index)).c_str())) {
+				OpenMaterialFile(mat.first);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(("Reload file###1000" + to_string(index)).c_str())) {
+				layer.Lock();
+				VMaterial::ReloadMaterial(mat.first);
+				layer.MarkDirty();
+				layer.Unlock();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(("Save to file###2000" + to_string(index)).c_str())) {
+				mat.second->SaveToFile();
+			}
+
+			auto propertie = mat.second->GetAllProperties();
+			for each (auto prop in propertie)
+			{
+				if (prop.second.Type() == "int") LeftLabelText(prop.first + ": ", to_string(*(prop.second.GetData<int>())));
+				else if (prop.second.Type() == "string") LeftLabelText(prop.first + ": ", *prop.second.GetData<string>());
+				else if (prop.second.Type() == "float") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float>())));
+				else if (prop.second.Type() == "float2") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float2>())));
+				else if (prop.second.Type() == "float3") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float3>())));
+				else if (prop.second.Type() == "float4") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float4>())));
+			}
+
+			ImGui::Separator();
+			index++;
+		}
+
 		ImGui::End();
 	}
 
@@ -170,12 +256,17 @@ public:
 		//Main Menu
 		DrawMainMenu();
 
-		// Settings
+		// Console
 		if (show_console_window) DrawConsole();
 
+		// Settings
 		if (show_setting_window) DrawSettings();
 
+		// Output
 		if (show_output_window) DrawOutput();
+
+		// Material
+		if (show_material_window) DrawMaterial();
 	}
 
 
@@ -255,7 +346,6 @@ int Main_Loop(int, char**)
 	ShowWindow(hwnd, SW_SHOW);
 	ShowWindow(hwnd, SW_HIDE);
 	UpdateWindow(hwnd);
-
 
 	DX_Window = hwnd;
 

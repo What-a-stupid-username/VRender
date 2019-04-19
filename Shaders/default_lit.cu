@@ -45,65 +45,70 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 	IN.metallic = metallic;
 	IN.smoothness = smoothness;
 	IN.normal = ffnormal;
+	
+	int in_to_out = dot(ray.direction, world_geometric_normal) > 0;
 
-	current_prd.radiance = make_float3(0);
 
+
+	float3 a;
+	float b;
+	baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
+	b = current_prd.depth * 2 + 1;
+	float cut_off = 1 / b;
+
+	if (current_prd.depth < max_depth)
 	{
-		int in_to_out = dot(ray.direction, world_geometric_normal) > 0;
-
-		float3 p;
-		PerRayData_pathtrace prd;
-		Ray next_ray;
-		prd.depth = current_prd.depth + 1;
-		prd.seed = current_prd.seed;
-		prd.radiance = make_float3(0);
-
-		float3 a;
-		float b;
-		baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
-
-		if (current_prd.depth < 6) 
+		if (z2 < cut_off)
 		{
 			optix::Onb onb(ffnormal);
-			{
-				float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
-				if (z1 < max_diffuse * transparent / (current_prd.depth + 2)) //透射部分
-				{
-					float pd;
-					float3 n;
-					ImportanceSampleGGX(make_float2(z1, z2), IN.smoothness, n, pd); //修正毛玻璃
-					onb.inverse_transform(n);
 
-					if (refract(p, ray.direction, n, in_to_out ? 1.0f / refraction_index : refraction_index)) {
-						prd.countEmitted = false;
+			float3 p;
+			PerRayData_pathtrace prd;
+			Ray next_ray;
+			prd.depth = current_prd.depth + 1;
+			prd.seed = current_prd.seed;
+			prd.radiance = make_float3(0);
 
-						next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+			float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
 
-						rtTrace(top_object, next_ray, prd);
+			float3 refr_diff_refl;
+			refr_diff_refl.x = max_diffuse * transparent;
+			refr_diff_refl.y = max_diffuse * (2 * in_to_out * transparent + 1 - in_to_out - transparent) * diffuse_strength;
+			refr_diff_refl.z = (1 - max_diffuse);
+			float sum_w = refr_diff_refl.x + refr_diff_refl.y + refr_diff_refl.z;
+			refr_diff_refl /= sum_w;
+			refr_diff_refl.y += refr_diff_refl.x;
 
-						current_prd.radiance += prd.radiance * baseColor / max_diffuse * (current_prd.depth + 2);
-					}
-				}
-				if (z2 < max_diffuse * (2 * in_to_out * transparent + 1 - in_to_out - transparent)) { //漫射部分
-					cosine_sample_hemisphere(z1, z2, p);
-					onb.inverse_transform(p);
+			if (z1 < refr_diff_refl.x) { //透射部分
+				float pd;
+				float3 n;
+				ImportanceSampleGGX(make_float2(z1, z2), IN.smoothness, n, pd); //修正毛玻璃
+				onb.inverse_transform(n);
 
+				if (refract(p, ray.direction, n, in_to_out ? 1.0f / refraction_index : refraction_index)) {
 					prd.countEmitted = false;
 
 					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 					rtTrace(top_object, next_ray, prd);
-					current_prd.radiance += prd.radiance * baseColor / max_diffuse * diffuse_strength;
+
+					current_prd.radiance = prd.radiance * baseColor / max_diffuse;
 				}
 			}
-			if (z1 < 1.f / (current_prd.depth+3))
-			{// 反射部分
+			else if (z1 < refr_diff_refl.y) { //漫射部分
+				cosine_sample_hemisphere(z1, z2, p);
+				onb.inverse_transform(p);
+
+				prd.countEmitted = false;
+
+				next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+
+				rtTrace(top_object, next_ray, prd);
+				current_prd.radiance = prd.radiance * baseColor / max_diffuse;
+			}
+			else { // 反射部分
 				float pd;
 				float3 n;
-				//uniform_sample_hemisphere(z1, z2, n);
-				if (z1 > 1 || z2 > 1 || z1 < 0 || z2 < 0) {
-					current_prd.radiance = make_float3(10000, 0, 10000); return;
-				}
 				ImportanceSampleGGX(make_float2(z1, z2), IN.smoothness, n, pd);
 
 				onb.inverse_transform(n);
@@ -116,13 +121,14 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 					rtTrace(top_object, next_ray, prd);
 
-					current_prd.radiance += PBS(IN, p, prd.radiance, -ray.direction) * (current_prd.depth + 3) / pd;
+					current_prd.radiance = PBS(IN, p, prd.radiance, -ray.direction) / pd / (1 - max_diffuse);
 				}
 			}
+			current_prd.radiance *= sum_w * b;
 		}
 	}
 
-	if (z1 > 1.f / (current_prd.depth + 1)) return;
+	if (z2 > cut_off) return;
 
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
@@ -154,7 +160,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
 				float3 light_satu = light.emission * weight * shadow_prd.inShadow;
-				current_prd.radiance += (PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor) * (current_prd.depth + 1);
+				current_prd.radiance += ((PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor)) * b;
 			}
 		}
 	}

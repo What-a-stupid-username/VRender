@@ -1,9 +1,12 @@
-#include "Material.h"
+#include "Components.h"
 
 
 static unordered_map<string, VShader*> shader_cache;
 static unordered_map<string, VMaterial*> material_table;
 static unordered_map<string, VGeometry*> geometry_cache;
+
+static set<VMaterial*> material_properties_change_table;
+static set<VTransform*> transform_change_table;
 
 
 
@@ -26,42 +29,48 @@ VShader::VShader(string shader_name) {
 }
 
 void VShader::LoadFromFile(string shader_name) {
-	for each (auto pair in closestHitProgram)
-	{
-		pair.second->destroy();
-	}
-	for each (auto pair in anyHitProgram)
-	{
-		pair.second->destroy();
-	}
-	closestHitProgram.clear();
-	anyHitProgram.clear();
-	auto& context = OptiXLayer::Context();
-	string all_contain;
-	std::ifstream file((std::string(sutil::samplesDir()) + "/Shaders/" + shader_name + ".cu").c_str());
-	if (file.good()) {
-		// Found usable source file
-		std::stringstream source_buffer;
-		source_buffer << file.rdbuf();
-		all_contain = source_buffer.str();
-	}
-	const char *ptx = sutil::getPtxString("Shaders", (shader_name + ".cu").c_str());
+	try {
+		for each (auto pair in closestHitProgram)
+		{
+			pair.second->destroy();
+		}
+		for each (auto pair in anyHitProgram)
+		{
+			pair.second->destroy();
+		}
+		closestHitProgram.clear();
+		anyHitProgram.clear();
+		auto& context = OptiXLayer::Context();
+		string all_contain;
+		std::ifstream file((std::string(sutil::samplesDir()) + "/Shaders/" + shader_name + ".cu").c_str());
+		if (file.good()) {
+			// Found usable source file
+			std::stringstream source_buffer;
+			source_buffer << file.rdbuf();
+			all_contain = source_buffer.str();
+		}
+		const char *ptx = sutil::getPtxString("Shaders", (shader_name + ".cu").c_str());
 
-	regex r("#pragma (.*?) (.*?)\n");
-	sregex_iterator it(all_contain.begin(), all_contain.end(), r);
-	sregex_iterator end;
-	for (; it != end; ++it)
-	{
-		int ray_type = Shit<int>::ToProperty(it->operator[](1));
-		string program_type = Shit<string>::ToProperty(it->operator[](2));
-		if (program_type == "ClosestHit") {
-			Program program = context->createProgramFromPTXString(ptx, shader_name + "_ClosestHit");
-			closestHitProgram[ray_type] = program;
+		regex r("#pragma (.*?) (.*?)\n");
+		sregex_iterator it(all_contain.begin(), all_contain.end(), r);
+		sregex_iterator end;
+		for (; it != end; ++it)
+		{
+			int ray_type = Shit<int>::ToProperty(it->operator[](1));
+			string program_type = Shit<string>::ToProperty(it->operator[](2));
+			if (program_type == "ClosestHit") {
+				Program program = context->createProgramFromPTXString(ptx, shader_name + "_ClosestHit");
+				closestHitProgram[ray_type] = program;
+			}
+			else if (program_type == "AnyHit") {
+				Program program = context->createProgramFromPTXString(ptx, shader_name + "_AnyHit");
+				anyHitProgram[ray_type] = program;
+			}
 		}
-		else if (program_type == "AnyHit") {
-			Program program = context->createProgramFromPTXString(ptx, shader_name + "_AnyHit");
-			anyHitProgram[ray_type] = program;
-		}
+	}
+	catch (Exception& e) {
+		cout << e.getErrorString() << endl;
+		system("PAUSE");
 	}
 }
 
@@ -149,7 +158,6 @@ VGeometry * VGeometry::Find(string name) {
 }
 
 
-static set<VMaterial*> material_properties_change_table;
 
 void VMaterial::ApllyAllChanges()
 {
@@ -160,16 +168,18 @@ void VMaterial::ApllyAllChanges()
 	material_properties_change_table.clear();
 }
 
+void VMaterial::ReloadMaterial(string name) {
+	auto pair = material_table.find(name);
+	if (pair != material_table.end()) {
+		pair->second->Reload(name);
+		return;
+	}
+	auto mat = new VMaterial(name);
+	material_table[name] = mat;
+}
+
 VMaterial::VMaterial(string name) {
-	this->name = name;
-	mat = OptiXLayer::Context()->createMaterial();
-	PropertyReader reader("/Materials", name + ".txt");
-	shader_name = reader.GetPropertyValue<string>("Shader");
-	auto shader = VShader::Find(shader_name);
-	properties = reader.GetAllProperties();
-	shader->reference[this] = bind(&VMaterial::ReloadShader, this);
-	ReloadShader();
-	MarkDirty();
+	Reload(name);
 }
 
 void VMaterial::ReloadShader() {
@@ -194,6 +204,19 @@ void VMaterial::Release() {
 	}
 	properties.clear();
 	name = shader_name = "";
+}
+
+void VMaterial::Reload(string name) {
+	this->name = name;
+	mat = OptiXLayer::Context()->createMaterial();
+	PropertyReader reader("/Materials", name + ".txt");
+	if (shader_name != "") VShader::Find(shader_name)->reference.erase(this);
+	shader_name = reader.GetPropertyValue<string>("Shader");
+	auto shader = VShader::Find(shader_name);
+	properties = reader.GetAllProperties();
+	shader->reference[this] = bind(&VMaterial::ReloadShader, this);
+	ReloadShader();
+	MarkDirty();
 }
 
 void VMaterial::SaveToFile() {
@@ -224,9 +247,6 @@ VTransform::VTransform() {
 	auto& context = OptiXLayer::Context();
 	transform = context->createTransform();
 	transform->setMatrix(false, indentity, indentity);
-	hook = context->createGeometryGroup();
-	hook->setAcceleration(context->createAcceleration("Trbvh"));
-	transform->setChild(hook);
 }
 
 void VTransform::Setparent(VTransform * trans) {
@@ -256,6 +276,7 @@ VTransform* VTransform::Root() {
 }
 
 void VTransform::MarkDirty() {
+	transform_change_table.insert(this);
 	if (parent) {
 		parent->MarkDirty();
 	}
@@ -263,12 +284,12 @@ void VTransform::MarkDirty() {
 
 
 VGeometryFilter::VGeometryFilter(VGeometry * geometry) {
-	this->geometry = OptiXLayer::Context()->createGeometry();
+	auto& context = OptiXLayer::Context();
+	this->geometry = context->createGeometry();
 	geometry_shader = geometry;
 	this->geometry->setBoundingBoxProgram(geometry_shader->bound);
 	this->geometry->setIntersectionProgram(geometry_shader->intersect);
 	this->geometry->setPrimitiveCount(1u);
-	//this->geometry->validate();
 }
 
 Handle<VariableObj> VGeometryFilter::Visit(const char * varname)
@@ -282,11 +303,17 @@ void VObject::RebindMaterial() {
 }
 
 VObject::VObject(string geometry_shader_name) {
-	go = OptiXLayer::Context()->createGeometryInstance();
+	auto& context = OptiXLayer::Context();
+	go = context->createGeometryInstance();
 	transform = new VTransform();
 	transform->Setparent();
 
-	transform->hook->addChild(go);
+
+	hook = context->createGeometryGroup();
+	hook->setAcceleration(context->createAcceleration("Trbvh"));
+	hook->addChild(go);
+
+	transform->transform->setChild(hook);
 
 	auto geo = VGeometry::Find(geometry_shader_name);
 	geometryFilter = new VGeometryFilter(geo);

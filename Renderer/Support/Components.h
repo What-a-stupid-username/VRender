@@ -37,13 +37,14 @@ private:
 	unordered_map<VObject*, function<void()>> reference;
 public:
 
-	Material mat;
+	Material mat = NULL;
 private:
 	VMaterial() { name = shader_name = ""; }
 	~VMaterial() {}
 	VMaterial(string name);
 	void ReloadShader();
 	void Release();
+	void Reload(string name);
 public:
 	inline string GetName() { return name; }
 	void SaveToFile();
@@ -54,11 +55,13 @@ public:
 	void ChangeProperty(string name, T value);
 
 	void MarkDirty();
+	inline const unordered_map<string, VProperty>& GetAllProperties() { return properties; }
 private:
 public:
 	static VMaterial* Find(string name);
 	static unordered_map<string, VMaterial*> GetAllMaterials();
 	static void ApllyAllChanges();
+	static void ReloadMaterial(string name);
 };
 
 class VGeometry {
@@ -93,10 +96,11 @@ class VTransform {
 	friend class VObject;
 	Group group = NULL;
 	Transform transform;
-	GeometryGroup hook;
 
 	VTransform* parent = NULL;
 	set<VTransform*> childs;
+
+	float3 pos, rotate, scale;
 
 	VTransform();
 public:
@@ -109,9 +113,23 @@ public:
 	void MarkDirty();
 
 	Group Group() { return group; }
+
+	template<typename T>
+	T* Position() {
+		return <T*>&pos;
+	}
+	template<typename T>
+	T* Rotation() {
+		return <T*>&pos;
+	}
+	template<typename T>
+	T* Scale() {
+		return <T*>&pos;
+	}
 };
 
 class VObject {
+	GeometryGroup hook;
 	VTransform* transform = NULL;
 	VMaterial* material = NULL;
 	VGeometryFilter* geometryFilter = NULL;

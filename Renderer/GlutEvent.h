@@ -2,6 +2,7 @@
 
 #include "CommonInclude.h"
 #include "OptiXLayer.h"
+#include "resource.h"
 
 // Mouse state
 int2           mouse_prev_pos;
@@ -68,12 +69,19 @@ void glutResize(int w, int h)
 
 HWND GL_Window;
 HWND DX_Window;
-
 void glutDisplay()
 {
+	static bool first_run = true;
+	if (first_run) {
+		SetForegroundWindow(GL_Window);
+		SetFocus(GL_Window);
+		first_run = false;
+	}
 	OptiXLayer::RenderResult();
 
+	OptiXLayer::Lock();
 	sutil::displayBufferGL(OptiXLayer::GetResult());
+	OptiXLayer::Unlock();
 
 	glutSwapBuffers();
 
@@ -94,10 +102,19 @@ void glutInitialize(int* argc, char** argv)
 	LONG_PTR Style = ::GetWindowLongPtr(GL_Window, GWL_STYLE);
 	Style = Style &~WS_MAXIMIZEBOX;
 	::SetWindowLongPtr(GL_Window, GWL_STYLE, Style);
-
+	HINSTANCE hInstance = ::GetModuleHandle(NULL);
+	if (NULL != hInstance) 	{
+		HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+		::SendMessage(GL_Window, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+		::SendMessage(GL_Window, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+	}
 	glutHideWindow();
 }
 
+void glutExitProgram() {
+	OptiXLayer::Release();
+	exit(0);
+}
 
 void glutRun()
 {
@@ -124,7 +141,7 @@ void glutRun()
 
 	// register shutdown handler
 #ifdef _WIN32
-	glutCloseFunc(OptiXLayer::Release);
+	glutCloseFunc(glutExitProgram);
 #else
 	atexit(OptiXLayer::Release);
 #endif

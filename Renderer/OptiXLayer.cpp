@@ -1,5 +1,5 @@
 #include "OptiXLayer.h"
-#include "Support/Material.h"
+#include "Support/Components.h"
 
 Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
@@ -125,7 +125,7 @@ void OptiXLayer::Init() {
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
 		context->setStackSize(2000);
-		context->setMaxTraceDepth(7);//only work with optix6.0.0+, if you get an error here, just commented out this
+		//context->setMaxTraceDepth(7);//only work with optix6.0.0+, if you get an error here, just commented out this
 
 
 		context["scene_epsilon"]->setFloat(1.e-3f);
@@ -169,7 +169,6 @@ void OptiXLayer::Init() {
 		context->setExceptionProgram(1, context->createProgramFromPTXString(ptx, "exception"));
 		context->setMissProgram(1, context->createProgramFromPTXString(ptx, "miss"));
 
-		context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 		context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
 		context["bg_color"]->setFloat(make_float3(0.0f));
 
@@ -265,14 +264,14 @@ void OptiXLayer::LoadScene() {
 		// Back wall
 		Foo::foo(make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), make_float3(556.0f, 0.0f, 0.0f), "default_feb");
 		// Right wall
-		Foo::foo(make_float3(1.0f, 0.0f, 0.0f), make_float3(0.0f, 548.8f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), "default_blue");
+		Foo::foo(make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 548.8f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), "default_blue");
 		// Left wall
 		Foo::foo(make_float3(556.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), "default_red");
 		// Short block
 		Foo::foo(make_float3(130.0f, 165.0f, 65.0f), make_float3(-48.0f, 0.0f, 160.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
 		Foo::foo(make_float3(290.0f, 0.0f, 114.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-50.0f, 0.0f, 158.0f), "default_transparent");
 		Foo::foo(make_float3(130.0f, 0.0f, 65.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
-		Foo::foo(make_float3(82.0f, 0.0f, 225.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(48.0f, 0.0f, -160.0f), "default_transparent");;
+		Foo::foo(make_float3(82.0f, 0.0f, 225.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(48.0f, 0.0f, -160.0f), "default_transparent");
 		Foo::foo(make_float3(240.0f, 0.0f, 272.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-158.0f, 0.0f, -47.0f), "default_transparent");
 
 		//// Tall block
@@ -285,10 +284,13 @@ void OptiXLayer::LoadScene() {
 		//Light
 		Foo::foo(make_float3(343.0f, 548.6f, 227.0f), make_float3(0.0f, 0.0f, 105.0f), make_float3(-130.0f, 0.0f, 0.0f), "light");
 
-		context["top_shadower"]->set(VTransform::Root()->Group());
+		//GeometryGroup group = context->createGeometryGroup(gis.begin(), gis.end());
+		//group->setAcceleration(context->createAcceleration("Trbvh"));
+
+		context["top_shadower"]->set(VTransform::Root()->Group()/*group*/);
 
 
-		context["top_object"]->set(VTransform::Root()->Group());
+		context["top_object"]->set(VTransform::Root()->Group()/*group*/);
 
 		Instance().dirty = true;
 	}
@@ -304,15 +306,18 @@ void OptiXLayer::LoadScene() {
 void OptiXLayer::RenderResult(uint maxFrame) {
 	auto& layer = Instance();
 	if (layer.pause) return;
+	if (layer.camera.staticFrameNum > maxFrame) return;
 	layer.rendering.lock();
 	layer.camera.UpdateOptiXContext(layer.context, layer.screenWidth, layer.screenHeight, layer.dirty);
-	if (layer.camera.staticFrameNum > maxFrame) return;
 	try {
 		layer.context->validate();
 		layer.cb->validate();
 
 		layer.context["rnd_seed"]->setUint(rand());
 		layer.context["diffuse_strength"]->setFloat(layer.diffuse_strength);
+		layer.context["max_depth"]->setInt(layer.max_depth);
+		layer.context["cut_off_high_variance_result"]->setUint(layer.cut_off_high_variance_result);
+		layer.context["sqrt_num_samples"]->setUint(layer.sqrt_num_samples);
 		Variable(layer.tonemapStage->queryVariable("exposure"))->setFloat(layer.exposure);
 
 		//auto length_buffer = layer.context["length_buffer"]->getBuffer();
@@ -375,9 +380,10 @@ void OptiXLayer::RebuildCommandList(bool openPost) {
 void OptiXLayer::SaveResultToFile(string name)
 {
 	auto& layer = Instance();
+
 	layer.rendering.lock();
 
-	sutil::displayBufferPPM(&name[0], layer.GetResult());
+	sutil::displayBufferBMP(&name[0], layer.GetResult(), false);
 
 	layer.rendering.unlock();
 }

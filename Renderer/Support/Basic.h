@@ -40,6 +40,7 @@ public:
 	template<>
 	inline string* GetData<string>() { return (string*)data; };
 
+	inline const string& Type() { return type; }
 
 	void Release() {
 		delete[] data;
@@ -65,16 +66,16 @@ string GetType() {
 class PropertyWriter {
 	FILE* fp;
 	unordered_map<string, string> table;
-
+public:
 	template<typename T>
-	inline string ToString(const T v) { return to_string(v); }
-	inline string ToString(const float v) { return to_string(v); }
-	inline string ToString(const int v) { return to_string(v); }
-	inline string ToString(const float2 v) { return ToString(v.x) + ',' + ToString(v.y); }
-	inline string ToString(const float3 v) { return ToString(v.x) + ',' + ToString(v.y) + ',' + ToString(v.z); }
-	inline string ToString(const float4 v) { return ToString(v.x) + ',' + ToString(v.y) + ',' + ToString(v.z) + ',' + ToString(v.w); }
-	inline string ToString(const char* v) { return string(v); }
-	inline string ToString(const string v) { return v; }
+	static inline string ToString(const T v) { return to_string(v); }
+	static inline string ToString(const float v) { return to_string(v); }
+	static inline string ToString(const int v) { return to_string(v); }
+	static inline string ToString(const float2 v) { return ToString(v.x) + ',' + ToString(v.y); }
+	static inline string ToString(const float3 v) { return ToString(v.x) + ',' + ToString(v.y) + ',' + ToString(v.z); }
+	static inline string ToString(const float4 v) { return ToString(v.x) + ',' + ToString(v.y) + ',' + ToString(v.z) + ',' + ToString(v.w); }
+	static inline string ToString(const char* v) { return string(v); }
+	static inline string ToString(const string v) { return v; }
 
 	template<typename T>
 	string GetTypeName() {

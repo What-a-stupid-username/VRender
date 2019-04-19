@@ -32,7 +32,8 @@ rtDeclareVariable(unsigned int, pathtrace_shadow_ray_type, , );
 
 
 rtDeclareVariable(unsigned int, rnd_seed, , );
-rtDeclareVariable(float, diffuse_strength, , ) = 1;
+rtDeclareVariable(float, diffuse_strength, , );
+rtDeclareVariable(int, max_depth, , );
 
 
 rtBuffer<float4, 2>              output_buffer;

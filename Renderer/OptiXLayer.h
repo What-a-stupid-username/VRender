@@ -43,7 +43,6 @@ private:
 	uint32_t       screenWidth = 512;
 	uint32_t       screenHeight = 512;
 
-	int            sqrt_num_samples = 2;
 
 	bool dirty = true;
 
@@ -58,7 +57,10 @@ private:
 public:
 	bool pause = false;
 	float exposure = 3.f, gamma = 2.2f;
+	int sqrt_num_samples = 1;
 	float diffuse_strength = 1;
+	int max_depth = 9;
+	bool cut_off_high_variance_result = true;
 
 	enum ResultBufferType { origial, tonemap, denoise };
 	ResultBufferType resultType =  origial;
@@ -146,9 +148,11 @@ public:
 		h = layer.screenHeight;
 	}
 
-	inline void MaskDirty() { dirty = true;}
+	inline void MarkDirty() { dirty = true;}
 
 	static void SaveResultToFile(string name);
 
 	static void SetLoadSceneFunction(function<void(optix::Context&)> func) { Instance().load_scene_func = func; }
+	static void Lock() { Instance().rendering.lock(); };
+	static void Unlock() { Instance().rendering.unlock(); };
 };

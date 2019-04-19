@@ -13,11 +13,16 @@ add_sample_executable(Renderer
 	GlutEvent.h
 	GUI.hpp
 
-	Support/Material.h
-	Support/Material.cpp
-
 	Support/Basic.h
 	Support/Basic.cpp
+
+	Support/Components.h
+	Support/Components.cpp
+
+	Support/Scene.h
+	Support/Scene.cpp
+
+	resource.rc
 )
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)

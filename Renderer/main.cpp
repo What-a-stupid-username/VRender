@@ -4,14 +4,11 @@
 #include <thread>
 #include <shellapi.h>
 
-#include <Support/Material.h>
+#include <Support/Components.h>
 
 using namespace std;
 
 int main(int argc, char** argv) {
-	OptiXLayer::LazyInit();
-
-	auto mat = VMaterial::Find("default");
 	//HWND hwnd;
 	//hwnd = FindWindow("ConsoleWindowClass", NULL);
 	//if (hwnd)
@@ -19,6 +16,9 @@ int main(int argc, char** argv) {
 	//	ShowOwnedPopups(hwnd, SW_HIDE);
 	//	ShowWindow(hwnd, SW_HIDE);
 	//}
+
+	OptiXLayer::LazyInit();
+
 	thread([&]() {
 		try
 		{
