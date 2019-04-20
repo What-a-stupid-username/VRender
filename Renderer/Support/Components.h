@@ -25,6 +25,7 @@ private:
 public:
 	static VShader* Find(string name);
 	static void Reload(string name);
+	static unordered_map<string, VShader*> GetAllShaders();
 };
 
 class VObject;
@@ -45,11 +46,13 @@ private:
 	void ReloadShader();
 	void Release();
 	void Reload(string name);
+	void SetShaderAsShaderProperties();
 public:
 	inline string GetName() { return name; }
 	void SaveToFile();
 
 	void ApplyPropertiesChange();
+
 
 	template<typename T>
 	void ChangeProperty(string name, T value);
@@ -60,7 +63,7 @@ private:
 public:
 	static VMaterial* Find(string name);
 	static unordered_map<string, VMaterial*> GetAllMaterials();
-	static void ApllyAllChanges();
+	static bool ApllyAllChanges();
 	static void ReloadMaterial(string name);
 };
 

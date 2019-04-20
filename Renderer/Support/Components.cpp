@@ -101,11 +101,16 @@ VShader * VShader::Find(string name) {
 void VShader::Reload(string name) {
 	auto pair = shader_cache.find(name);
 	if (pair != shader_cache.end()) {
+		sutil::ReleasePtxString(name.c_str());
 		pair->second->LoadFromFile(name);
 		for each (auto mf in pair->second->reference) {
 			mf.second();
 		}
 	}
+}
+
+unordered_map<string, VShader*> VShader::GetAllShaders() {
+	return shader_cache;
 }
 
 VGeometry::VGeometry(string name) {
@@ -159,13 +164,16 @@ VGeometry * VGeometry::Find(string name) {
 
 
 
-void VMaterial::ApllyAllChanges()
+bool VMaterial::ApllyAllChanges()
 {
+	bool res = false;
+	if (material_properties_change_table.size()) res = true;
 	for each (auto mat in material_properties_change_table)
 	{
 		mat->ApplyPropertiesChange();
 	}
 	material_properties_change_table.clear();
+	return res;
 }
 
 void VMaterial::ReloadMaterial(string name) {
@@ -194,6 +202,7 @@ void VMaterial::ReloadShader() {
 	for each (auto mf in reference) {
 		mf.second();
 	}
+	MarkDirty();
 }
 
 void VMaterial::Release() {
@@ -234,6 +243,17 @@ void VMaterial::ApplyPropertiesChange() {
 	{
 		pair.second.SetProperty(mat, pair.first);
 	}
+	SetShaderAsShaderProperties();
+}
+
+void VMaterial::SetShaderAsShaderProperties() {
+	string new_shader_nam = *properties["Shader"].GetData<string>();
+	if (shader_name == new_shader_nam) return;
+	if (shader_name != "") VShader::Find(shader_name)->reference.erase(this);
+	shader_name = new_shader_nam;
+	auto shader = VShader::Find(shader_name);
+	shader->reference[this] = bind(&VMaterial::ReloadShader, this);
+	ReloadShader();
 }
 
 void VMaterial::MarkDirty() {

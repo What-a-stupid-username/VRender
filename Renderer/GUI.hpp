@@ -7,6 +7,7 @@
 #include <shellapi.h>
 #include <dwmapi.h>
 #include "Imgui/imgui.h"
+#include "Imgui/imgui_stdlib.h"
 #include "Imgui/imgui_impl_win32.h"
 #include "Imgui/imgui_impl_dx12.h"
 #include <d3d12.h>
@@ -21,6 +22,7 @@ class VGUI {
 	bool show_console_window = true;
 	bool show_output_window = false;
 	bool show_material_window = false;
+	bool show_shader_window = false;
 
 	ImVec2 next_Window_pos;
 	ImVec2 next_Window_pos_2;
@@ -35,6 +37,11 @@ public:
 private:
 	void OpenMaterialFile(string name) {
 		string str = ((string(sutil::samplesDir()) + "/Materials/" + name + ".txt").c_str());
+		auto k = ShellExecute(DX_Window, "open", str.c_str(), NULL, NULL, SW_SHOW);
+		//thread([name]() {cout << ; }).detach();d
+	}
+	void OpenShaderFile(string name) {
+		string str = ((string(sutil::samplesDir()) + "/Shaders/" + name + ".cu").c_str());
 		auto k = ShellExecute(DX_Window, "open", str.c_str(), NULL, NULL, SW_SHOW);
 		//thread([name]() {cout << ; }).detach();d
 	}
@@ -77,6 +84,7 @@ private:
 		ImGui::Checkbox("Open Setting Window", &show_setting_window);
 		ImGui::Checkbox("Open Output Window", &show_output_window);
 		ImGui::Checkbox("Open Material Window", &show_material_window);
+		ImGui::Checkbox("Open Shader View", &show_shader_window);
 		//ImGui::Separator();
 
 		//if (ImGui::Button("Focuse Renderer window")) {
@@ -95,7 +103,8 @@ private:
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
 		
 		if (layer.pause) {
 			if (ImGui::Button("Continue Renderer")) layer.pause = false;
@@ -165,7 +174,8 @@ private:
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
 
 		bool auto_resize_b = auto_resize != 2;
 		ImGui::Checkbox("Auto resize", &auto_resize_b);
@@ -182,7 +192,8 @@ private:
 		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 100));
 
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
-		next_Window_pos_2.x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
 
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
@@ -191,9 +202,48 @@ private:
 		ImGui::InputText("Output name", &name[0], name.size()+1, ImGuiInputTextFlags_::ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll);
 
 		if (ImGui::Button("Save")) {
-			thread([&]() { layer.SaveResultToFile(name + ".bmp"); }).detach();
+			thread([&]() { layer.SaveResultToFile(name); }).detach();
 		}
 		
+		ImGui::End();
+	}
+
+	void DrawShader() {
+		ImGui::Begin("Shaders", &show_shader_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+
+		ImGui::SetWindowPos(next_Window_pos);
+		auto& shader_table = VShader::GetAllShaders();
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 80 * (shader_table.size() > 5 ? 5 : (shader_table.size() < 1 ? 1 : shader_table.size()))));
+
+		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
+		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
+
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+
+		
+		int index = 0;
+		for each (auto shader in shader_table)
+		{
+			ImGui::Text(("Shader: " + shader.first).c_str());
+			if (ImGui::Button(("Open Shader###shader_open_" + to_string(index)).c_str())) {
+				OpenShaderFile(shader.first);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(("Reload Shader###shader_reload_" + to_string(index)).c_str())) {
+				layer.Lock();
+				VShader::Reload(shader.first);
+				layer.MarkDirty();
+				layer.Unlock();
+			}
+			ImGui::Separator();
+			index++;
+		}
+
+
+
+
 		ImGui::End();
 	}
 
@@ -202,9 +252,9 @@ private:
 
 		ImGui::SetWindowPos(next_Window_pos_2);
 
-		auto mat_table = VMaterial::GetAllMaterials();
+		auto& mat_table = VMaterial::GetAllMaterials();
 
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, 200 * min(mat_table.size(), 3)));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, 200 * (mat_table.size() > 3 ? 3 : (mat_table.size() < 1 ? 1 : mat_table.size()))));
 
 		next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
@@ -221,7 +271,6 @@ private:
 			if (ImGui::Button(("Reload file###1000" + to_string(index)).c_str())) {
 				layer.Lock();
 				VMaterial::ReloadMaterial(mat.first);
-				layer.MarkDirty();
 				layer.Unlock();
 			}
 			ImGui::SameLine();
@@ -230,14 +279,57 @@ private:
 			}
 
 			auto propertie = mat.second->GetAllProperties();
+			int index2 = 0;
 			for each (auto prop in propertie)
 			{
-				if (prop.second.Type() == "int") LeftLabelText(prop.first + ": ", to_string(*(prop.second.GetData<int>())));
-				else if (prop.second.Type() == "string") LeftLabelText(prop.first + ": ", *prop.second.GetData<string>());
-				else if (prop.second.Type() == "float") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float>())));
-				else if (prop.second.Type() == "float2") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float2>())));
-				else if (prop.second.Type() == "float3") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float3>())));
-				else if (prop.second.Type() == "float4") LeftLabelText(prop.first + ": ", PropertyWriter::ToString(*(prop.second.GetData<float4>())));
+				if (prop.second.Type() == "int") {
+					if (ImGui::InputInt((prop.first + "###Mat_prop" + to_string(index*1000+index2)).c_str(), prop.second.GetData<int>())) {
+						mat.second->MarkDirty();
+					}
+				}
+				else if (prop.second.Type() == "string") {
+					if (prop.first == "Shader") {
+						LeftLabelText(prop.first + ":  ", prop.second.GetData<string>()->c_str());
+					}
+					else {
+						ImGui::InputText((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<string>());
+					}
+				}
+				else if (prop.second.Type() == "float") {
+					if (ImGui::DragFloat((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>(), 0.001, 0, 1)) {
+						mat.second->MarkDirty();
+					}
+				}
+				else if (prop.second.Type() == "float2") {
+					if (ImGui::DragFloat2((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>(), 0.001, 0, 1)) {
+						mat.second->MarkDirty();
+					}
+				}
+				else if (prop.second.Type() == "float3") {
+					if (prop.first[0] == '!') {
+						if (ImGui::InputFloat3((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>())) {
+							mat.second->MarkDirty();
+						}
+					}
+					else {
+						if (ImGui::ColorEdit3((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>())) {
+							mat.second->MarkDirty();
+						}
+					}
+				}
+				else if (prop.second.Type() == "float4") {
+					if (prop.first[0] == '!') {
+						if (ImGui::InputFloat4((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>())) {
+							mat.second->MarkDirty();
+						}
+					}
+					else {
+						if (ImGui::ColorEdit4((prop.first + "###Mat_prop" + to_string(index * 1000 + index2)).c_str(), prop.second.GetData<float>())) {
+							mat.second->MarkDirty();
+						}
+					}
+				}
+				index2++;
 			}
 
 			ImGui::Separator();
@@ -264,6 +356,10 @@ public:
 
 		// Output
 		if (show_output_window) DrawOutput();
+
+		// Shader
+		if (show_shader_window) DrawShader();
+
 
 		// Material
 		if (show_material_window) DrawMaterial();

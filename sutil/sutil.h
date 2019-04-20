@@ -197,6 +197,7 @@ void SUTILAPI parseDimensions(
 // Get current time in seconds for benchmarking/timing purposes.
 double SUTILAPI currentTime();
 
+SUTILAPI void ReleasePtxString(const char* name);
 // Get PTX, either pre-compiled with NVCC or JIT compiled by NVRTC.
 SUTILAPI const char* getPtxString(
         const char* sample,                 // Name of the sample, used to locate the input file. NULL = only search the common /cuda dir

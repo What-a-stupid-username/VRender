@@ -1126,6 +1126,17 @@ struct PtxSourceCache
 };
 static PtxSourceCache g_ptxSourceCache;
 
+void sutil::ReleasePtxString(const char* name) {
+	std::string *ptx, cu;
+	std::string key = std::string(name) + ".cu;" + "Shaders";
+	std::map<std::string, std::string *>::iterator elem = g_ptxSourceCache.map.find(key);
+	if (elem != g_ptxSourceCache.map.end())
+	{
+		delete elem->second;
+		g_ptxSourceCache.map.erase(key);
+	}
+}
+
 const char* sutil::getPtxString(
     const char* sample,
     const char* filename,

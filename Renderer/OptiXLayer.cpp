@@ -307,6 +307,7 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 	auto& layer = Instance();
 	if (layer.pause) return;
 	if (layer.camera.staticFrameNum > maxFrame) return;
+	//Sleep(200);
 	layer.rendering.lock();
 	layer.camera.UpdateOptiXContext(layer.context, layer.screenWidth, layer.screenHeight, layer.dirty);
 	try {
@@ -327,7 +328,7 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 
 		layer.dirty = false;
 
-		VMaterial::ApllyAllChanges();
+		if (VMaterial::ApllyAllChanges()) layer.dirty = true;
 		layer.cb->execute();
 	}
 	catch (Exception& e) {
