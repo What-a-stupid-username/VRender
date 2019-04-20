@@ -169,7 +169,7 @@ private:
 	void DrawSettings() {
 		ImGui::Begin("Settings", &show_setting_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 120));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 60));
 		
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
