@@ -7,13 +7,13 @@ class VScene {
 private:
 
 public:
-	VScene scene;
-
-
 
 
 public:
 	static void LoadScene(string path) {
-		VProperty
+		auto& layer = OptiXLayer::Instance();
+
+
+
 	}
 };

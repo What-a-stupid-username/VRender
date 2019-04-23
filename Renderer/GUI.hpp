@@ -3,6 +3,7 @@
 
 #include <GlutEvent.h>
 #include <Support/Components.h>
+#include <Support/Scene.h>
 
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -14,6 +15,119 @@
 #include <dxgi1_4.h>
 #include <tchar.h>
 #include <time.h>
+#include<io.h>
+
+class FileLoader {
+private:
+	void find(const char* lpPath, string type)
+	{
+		vector<string> files_new;
+		files.clear();
+		floders.clear();
+
+		char szFind[MAX_PATH];
+		WIN32_FIND_DATA FindFileData;
+
+		strcpy(szFind, lpPath);
+		strcat(szFind, "/*.*");
+
+		HANDLE hFind = ::FindFirstFile(szFind, &FindFileData);
+		if (INVALID_HANDLE_VALUE == hFind)  return;
+
+		while (true)
+		{
+			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			{
+				if (FindFileData.cFileName[0] != '.')
+				{
+					floders.push_back((char*)(FindFileData.cFileName));
+				}
+			}
+			else
+			{
+				files_new.push_back(FindFileData.cFileName);
+			}
+			if (!FindNextFile(hFind, &FindFileData))  break;
+		}
+		FindClose(hFind);
+
+		for each (auto name in files_new)
+		{
+			int n_l = name.length(), t_l = type.length();
+			if (n_l > t_l) {
+				if (name.substr(n_l - t_l, t_l) == type) {
+					files.push_back(name);
+				}
+			}
+		}
+
+	}
+	vector<string> files;
+	vector<string> floders;
+public:
+	string result;
+
+public:
+	FileLoader() { ResetToDefault(); }
+	void ResetToDefault() {
+		result = sutil::samplesDir();
+	}
+
+	bool Draw(ImVec2& need_size, string type, bool& open) {
+		if (!open) return false;
+		ImGui::Begin("Setlect file", &open, ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse);
+		ImGui::SetWindowFocus();
+
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		need_size = ImVec2(max(need_size.x, tmp.x), max(need_size.y, tmp.y));
+
+		find(result.c_str(), type);
+
+		ImGui::Text(result.c_str());
+		ImGui::Separator();
+
+		int k = result.find_last_of('/');
+		if (k != -1) {
+			if (ImGui::Selectable("..###FileLoader", false, ImGuiSelectableFlags_::ImGuiSelectableFlags_AllowDoubleClick)) {
+				result = result.substr(0, k);
+			}
+		}
+
+		
+		int index = 0;
+
+		for each (auto name in files)
+		{
+			if (ImGui::Selectable((name + "###FileLoader" + to_string(index++)).c_str(), false, ImGuiSelectableFlags_::ImGuiSelectableFlags_AllowDoubleClick)) {
+				result += "/" + name;
+				open = false;
+				ImGui::End();
+				return true;
+			}
+		}
+
+		for each (auto name in floders)
+		{
+			if (ImGui::Selectable(("/" + name + "###FileLoader" + to_string(index++)).c_str(), false, ImGuiSelectableFlags_::ImGuiSelectableFlags_AllowDoubleClick)) {
+				result += "/" + name;
+			}
+		}
+
+
+		ImGui::End();
+		return false;
+	}
+};
+
+
+
+
+
+
+
+
+
+
 
 class VGUI {
 	OptiXLayer& layer;
@@ -23,11 +137,12 @@ class VGUI {
 	bool show_output_window = false;
 	bool show_material_window = false;
 	bool show_shader_window = false;
+	bool show_scene_window = false;
 
 	ImVec2 next_Window_pos;
 	ImVec2 next_Window_pos_2;
 
-	int auto_resize = 2;
+	int auto_resize = 0;
 
 public:
 	ImVec4 back_ground_color = ImVec4(1.f, 0.55f, 1.f, 1.f);
@@ -85,12 +200,7 @@ private:
 		ImGui::Checkbox("Open Output Window", &show_output_window);
 		ImGui::Checkbox("Open Material Window", &show_material_window);
 		ImGui::Checkbox("Open Shader View", &show_shader_window);
-		//ImGui::Separator();
-
-		//if (ImGui::Button("Focuse Renderer window")) {
-		//	SetForegroundWindow(GL_Window);
-		//	SetFocus(GL_Window);
-		//}
+		ImGui::Checkbox("Open Scene Window", &show_scene_window);
 
 		ImGui::End();
 	}
@@ -128,6 +238,8 @@ private:
 				layer.resultType = OptiXLayer::ResultBufferType::tonemap;
 			if (ImGui::MenuItem("denoised Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::denoise))
 				layer.resultType = OptiXLayer::ResultBufferType::denoise;
+			if (ImGui::MenuItem("helper Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::helper))
+				layer.resultType = OptiXLayer::ResultBufferType::helper;
 		}
 
 		ImGui::Separator();
@@ -138,7 +250,7 @@ private:
 		}
 
 		static bool post = false;
-		if (layer.resultType != OptiXLayer::ResultBufferType::origial) {
+		if (layer.resultType != OptiXLayer::ResultBufferType::origial && layer.resultType != OptiXLayer::ResultBufferType::helper) {
 			if (post == false) layer.RebuildCommandList(true);
 			ImGui::SliderFloatLableOnLeft("Exposure", "###1", &layer.exposure, 0, 100, "%.4f", 3);
 			post = true;
@@ -169,7 +281,7 @@ private:
 	void DrawSettings() {
 		ImGui::Begin("Settings", &show_setting_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 60));
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 160));
 		
 		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
@@ -178,9 +290,23 @@ private:
 		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
 
 		bool auto_resize_b = auto_resize != 2;
-		ImGui::Checkbox("Auto resize", &auto_resize_b);
+		ImGui::Checkbox("Free size window", &auto_resize_b);
 		if (auto_resize_b) auto_resize = 0;
 		else auto_resize = 2;
+
+		static int style_idx = 0;
+		if (ImGui::Combo("Style###StyleSelector", &style_idx, "Dark\0Light\0"))
+		{
+			switch (style_idx)
+			{
+			case 0: ImGui::StyleColorsDark(); break;
+			case 1: ImGui::StyleColorsLight(); break;
+			}
+		}
+
+		ImGuiIO& io = ImGui::GetIO();
+		ImGui::SliderFloat("Scale", &io.FontGlobalScale, 0.5, 2, "%.1f");
+
 
 		ImGui::End();
 	}
@@ -204,7 +330,7 @@ private:
 		if (ImGui::Button("Save")) {
 			thread([&]() { layer.SaveResultToFile(name); }).detach();
 		}
-		
+
 		ImGui::End();
 	}
 
@@ -221,7 +347,6 @@ private:
 
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-
 		
 		int index = 0;
 		for each (auto shader in shader_table)
@@ -240,9 +365,6 @@ private:
 			ImGui::Separator();
 			index++;
 		}
-
-
-
 
 		ImGui::End();
 	}
@@ -339,8 +461,43 @@ private:
 		ImGui::End();
 	}
 
+	void DrawScene() {
+		ImGui::Begin("Scene", &show_scene_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+
+		ImGui::SetWindowPos(next_Window_pos_2);
+
+		auto& mat_table = VMaterial::GetAllMaterials();
+
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, 200));
+
+		next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+
+		static string scene_path = "Default Cornell";
+		static FileLoader fl;
+		static bool openFile = false;
+		ImGui::Text(scene_path.c_str());
+		ImGui::SameLine();
+		if (ImGui::Button("Open scene")) { openFile = true; };
+		if (fl.Draw(needed_size, ".scene", openFile)) {
+			scene_path = fl.result;
+			VScene::LoadScene(scene_path);
+		}
+		ImGui::Separator();
+
+
+
+		ImGui::End();
+	}
+
+
 public:
-	VGUI() :layer(OptiXLayer::Instance()) {}
+	VGUI() :layer(OptiXLayer::Instance()) {
+		auto& style = ImGui::GetStyle();
+		style.FrameRounding = 12.f;
+		style.GrabRounding = 12.f;
+	}
 
 
 	void OnDrawGUI() {
@@ -360,6 +517,8 @@ public:
 		// Shader
 		if (show_shader_window) DrawShader();
 
+		// Scene
+		if (show_scene_window) DrawScene();
 
 		// Material
 		if (show_material_window) DrawMaterial();

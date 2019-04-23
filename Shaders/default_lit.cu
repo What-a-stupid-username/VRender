@@ -53,7 +53,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 	float3 a;
 	float b;
 	baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
-	b = current_prd.depth * 2 + 1;
+	b = (current_prd.depth + 1) * current_prd.importance;
 	float cut_off = 1 / b;
 
 	if (current_prd.depth < max_depth)
@@ -67,6 +67,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 			Ray next_ray;
 			prd.depth = current_prd.depth + 1;
 			prd.seed = current_prd.seed;
+			prd.importance = current_prd.importance;
 			prd.radiance = make_float3(0);
 
 			float max_diffuse = max(max(baseColor.x, baseColor.y), baseColor.z);
@@ -128,7 +129,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 		}
 	}
 
-	if (z2 > cut_off) return;
+	//if (z2 > cut_off) return;
 
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
@@ -160,7 +161,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
 				float3 light_satu = light.emission * weight * shadow_prd.inShadow;
-				current_prd.radiance += ((PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor)) * b;
+				current_prd.radiance += ((PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor));
 			}
 		}
 	}

@@ -59,10 +59,10 @@ public:
 	float exposure = 3.f, gamma = 2.2f;
 	int sqrt_num_samples = 1;
 	float diffuse_strength = 1;
-	int max_depth = 9;
+	int max_depth = 4;
 	bool cut_off_high_variance_result = true;
 
-	enum ResultBufferType { origial, tonemap, denoise };
+	enum ResultBufferType { origial, tonemap, denoise, helper };
 	ResultBufferType resultType =  origial;
 
 private:
@@ -85,6 +85,10 @@ public:
 		return Instance().context["output_buffer"]->getBuffer();
 	}
 
+	inline static Buffer HelperBuffer() {
+		return Instance().context["helper_buffer"]->getBuffer();
+	}
+
 	inline static Buffer ToneMappedBuffer() {
 		return Instance().context["tonemapped_buffer"]->getBuffer();
 	}
@@ -103,6 +107,8 @@ public:
 			return layer.context["tonemapped_buffer"]->getBuffer();
 		case denoise:
 			return layer.context["output_denoisedBuffer"]->getBuffer();
+		case helper:
+			return layer.context["helper_buffer"]->getBuffer();
 		default:
 			break;
 		}

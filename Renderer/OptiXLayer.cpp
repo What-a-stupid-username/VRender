@@ -125,7 +125,6 @@ void OptiXLayer::Init() {
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
 		context->setStackSize(2000);
-		//context->setMaxTraceDepth(7);//only work with optix6.0.0+, if you get an error here, just commented out this
 
 
 		context["scene_epsilon"]->setFloat(1.e-3f);
@@ -135,6 +134,8 @@ void OptiXLayer::Init() {
 
 		Buffer buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, screenWidth, screenHeight, false);
 		context["output_buffer"]->set(buffer);
+		Buffer helperBuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, screenWidth, screenHeight, false);
+		context["helper_buffer"]->set(helperBuffer);
 
 		Buffer denoisedBuffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, screenWidth, screenHeight, false);
 		context["output_denoisedBuffer"]->set(denoisedBuffer);
@@ -307,7 +308,7 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 	auto& layer = Instance();
 	if (layer.pause) return;
 	if (layer.camera.staticFrameNum > maxFrame) return;
-	//Sleep(200);
+
 	layer.rendering.lock();
 	layer.camera.UpdateOptiXContext(layer.context, layer.screenWidth, layer.screenHeight, layer.dirty);
 	try {
@@ -317,6 +318,7 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 		layer.context["rnd_seed"]->setUint(rand());
 		layer.context["diffuse_strength"]->setFloat(layer.diffuse_strength);
 		layer.context["max_depth"]->setInt(layer.max_depth);
+		//layer.context->setMaxTraceDepth(layer.max_depth+1);//only work with optix6.0.0+, if you get an error here, just commented out this
 		layer.context["cut_off_high_variance_result"]->setUint(layer.cut_off_high_variance_result);
 		layer.context["sqrt_num_samples"]->setUint(layer.sqrt_num_samples);
 		Variable(layer.tonemapStage->queryVariable("exposure"))->setFloat(layer.exposure);
@@ -350,6 +352,7 @@ bool OptiXLayer::ResizeBuffer(int & w, int & h) {
 	layer.screenHeight = h;
 
 	sutil::resizeBuffer(OptiXLayer::OriginBuffer(), w, h);
+	sutil::resizeBuffer(OptiXLayer::HelperBuffer(), w, h);
 	sutil::resizeBuffer(OptiXLayer::ToneMappedBuffer(), w, h);
 	sutil::resizeBuffer(OptiXLayer::DenoisedBuffer(), w, h);
 

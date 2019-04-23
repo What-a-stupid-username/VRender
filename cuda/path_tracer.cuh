@@ -11,7 +11,8 @@ struct PerRayData_pathtrace
     float3 radiance;
     unsigned int seed;
     int depth;
-    int countEmitted;
+	int countEmitted;
+	float importance;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -36,7 +37,6 @@ rtDeclareVariable(float, diffuse_strength, , );
 rtDeclareVariable(int, max_depth, , );
 
 
-rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
 rtDeclareVariable(float3, bg_color, , );
