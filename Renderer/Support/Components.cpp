@@ -9,6 +9,11 @@ static set<VMaterial*> material_properties_change_table;
 static set<VTransform*> transform_change_table;
 
 
+static Buffer int3_default = NULL;
+static Buffer float3_default = NULL;
+static Buffer float2_default = NULL;
+static Buffer int_default = NULL;
+
 
 VMaterial * VMaterial::Find(string name) {
 	auto pair = material_table.find(name);
@@ -164,7 +169,7 @@ VGeometry * VGeometry::Find(string name) {
 
 
 
-bool VMaterial::ApllyAllChanges()
+bool VMaterial::ApplyAllChanges()
 {
 	bool res = false;
 	if (material_properties_change_table.size()) res = true;
@@ -267,6 +272,9 @@ VTransform::VTransform() {
 	auto& context = OptiXLayer::Context();
 	transform = context->createTransform();
 	transform->setMatrix(false, indentity, indentity);
+
+	pos = rotate = make_float3(0);
+	scale = make_float3(1);
 }
 
 void VTransform::Setparent(VTransform * trans) {
@@ -302,6 +310,17 @@ void VTransform::MarkDirty() {
 	}
 }
 
+bool VTransform::ApplyAllChanges() {
+	bool res = false;
+	if (transform_change_table.size()) res = true;
+	for each (auto trans in transform_change_table)
+	{
+		trans->ApplyPropertiesChange();
+	}
+	transform_change_table.clear();
+	return res;
+}
+
 
 VGeometryFilter::VGeometryFilter(VGeometry * geometry) {
 	auto& context = OptiXLayer::Context();
@@ -316,6 +335,43 @@ Handle<VariableObj> VGeometryFilter::Visit(const char * varname)
 {
 	object->MarkDirty();
 	return geometry[varname];
+}
+
+void VGeometryFilter::SetMesh(VMesh * mesh) {
+	object->MarkDirty();
+
+	geometry["vertex_buffer"]->setBuffer(mesh->vert_buffer);
+	geometry["v_index_buffer"]->setBuffer(mesh->v_index_buffer);
+
+
+	if (float3_default == NULL) {
+		float3_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, 0);
+		int3_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, 0);
+		float2_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT2, 0);
+		int_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT, 0);
+	}
+
+	if (mesh->normal_buffer != NULL) {
+		geometry["normal_buffer"]->setBuffer(mesh->normal_buffer);
+		geometry["n_index_buffer"]->setBuffer(mesh->n_index_buffer);
+	}
+	else {
+		geometry["normal_buffer"]->setBuffer(float3_default);
+		geometry["n_index_buffer"]->setBuffer(int3_default);
+	}
+	if (mesh->tex_buffer != NULL) {
+		geometry["texcoord_buffer"]->setBuffer(mesh->tex_buffer);
+		geometry["t_index_buffer"]->setBuffer(mesh->t_index_buffer);
+	}
+	else {
+		geometry["texcoord_buffer"]->setBuffer(float2_default);
+		geometry["t_index_buffer"]->setBuffer(int3_default);
+	}
+
+	geometry["material_buffer"]->setBuffer(int_default); //todo
+
+	RTsize size = -1; mesh->v_index_buffer->getSize(size);
+	geometry->setPrimitiveCount(size);
 }
 
 void VObject::RebindMaterial() {
@@ -334,6 +390,7 @@ VObject::VObject(string geometry_shader_name) {
 	hook->addChild(go);
 
 	transform->transform->setChild(hook);
+	transform->object = this;
 
 	auto geo = VGeometry::Find(geometry_shader_name);
 	geometryFilter = new VGeometryFilter(geo);
@@ -349,4 +406,152 @@ void VObject::SetMaterial(VMaterial * mat) {
 	go->setMaterialCount(1);
 	go->setMaterial(0, material->mat);
 	material->reference[this] = bind(&VObject::RebindMaterial, this);
+}
+
+
+unordered_map<string, VMesh*> mesh_table;
+
+VMesh::VMesh(string name) {
+	int k = name.find_last_of('.');
+	if (k == -1) throw Exception("ERROR mesh name.");
+
+	string format = name.substr(k, name.length() - k);
+
+	vector<float3> verts;
+	vector<float3> normals;
+	vector<float2> texcoords;
+	vector<int3> v_index;
+	vector<int3> t_index;
+	vector<int3> n_index;
+
+	if (format == ".obj" || format == ".OBJ") {
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		string warn, err;
+		tinyobj::LoadObj(&attrib, &shapes, NULL, &warn, &err, (string(sutil::samplesDir()) + "/Meshs/" + name).c_str());
+		if (err.length() != 0) throw Exception("ERROR read mesh.\n" + err);
+		if (warn.length() != 0) cout << warn << endl;
+
+		for (int i = 0; i < attrib.vertices.size() / 3; i++)
+		{
+			float3 v;
+			v.x = attrib.vertices[i * 3];
+			v.y = attrib.vertices[i * 3 + 1];
+			v.z = attrib.vertices[i * 3 + 2];
+			verts.push_back(v);
+		}
+		for (int i = 0; i < attrib.normals.size() / 3; i++)
+		{
+			float3 v;
+			v.x = attrib.normals[i * 3];
+			v.y = attrib.normals[i * 3 + 1];
+			v.z = attrib.normals[i * 3 + 2];
+			normals.push_back(v);
+		}
+		for (int i = 0; i < attrib.texcoords.size() / 2; i++)
+		{
+			float2 v;
+			v.x = attrib.texcoords[i * 2];
+			v.y = attrib.texcoords[i * 2 + 1];
+			texcoords.push_back(v);
+		}
+		for (int j = 0; j < shapes.size(); j++)
+		{
+			for (int i = 0; i <shapes[j].mesh.indices.size() / 3; i++)
+			{
+				int3 v;
+				v.x = shapes[j].mesh.indices[i * 3].vertex_index;
+				v.y = shapes[j].mesh.indices[i * 3 + 1].vertex_index;
+				v.z = shapes[j].mesh.indices[i * 3 + 2].vertex_index;
+				v_index.push_back(v);
+			}
+			for (int i = 0; i <shapes[j].mesh.indices.size() / 3; i++)
+			{
+				int3 v;
+				v.x = shapes[j].mesh.indices[i * 3].texcoord_index;
+				v.y = shapes[j].mesh.indices[i * 3 + 1].texcoord_index;
+				v.z = shapes[j].mesh.indices[i * 3 + 2].texcoord_index;
+				t_index.push_back(v);
+			}
+			for (int i = 0; i <shapes[j].mesh.indices.size() / 3; i++)
+			{
+				int3 v;
+				v.x = shapes[j].mesh.indices[i * 3].normal_index;
+				v.y = shapes[j].mesh.indices[i * 3 + 1].normal_index;
+				v.z = shapes[j].mesh.indices[i * 3 + 2].normal_index;
+				n_index.push_back(v);
+			}
+		}
+	}
+	else
+	{
+		throw Exception("ERROR unsupported mesh file format.");
+	}
+
+
+	auto& context = OptiXLayer::Context();
+
+	{//vert
+		{
+			vert_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, verts.size());
+			auto ptr = vert_buffer->map();
+			memcpy(ptr, verts.data(), verts.size() * sizeof(float3));
+			vert_buffer->unmap();
+		}
+		{
+			v_index_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, v_index.size());
+			auto ptr = v_index_buffer->map();
+			memcpy(ptr, v_index.data(), v_index.size() * sizeof(int3));
+			v_index_buffer->unmap();
+		}
+	}
+	if (!normals.empty())//normal
+	{
+		{
+			normal_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, normals.size());
+			auto ptr = normal_buffer->map();
+			memcpy(ptr, normals.data(), normals.size() * sizeof(float3));
+			normal_buffer->unmap();
+		}
+		{
+			n_index_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, n_index.size());
+			auto ptr = n_index_buffer->map();
+			memcpy(ptr, n_index.data(), n_index.size() * sizeof(float3));
+			n_index_buffer->unmap();
+		}
+	}
+	if (!texcoords.empty())//texcoord
+	{
+		{
+			tex_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT2, texcoords.size());
+			auto ptr = tex_buffer->map();
+			memcpy(ptr, texcoords.data(), texcoords.size() * sizeof(float2));
+			tex_buffer->unmap();
+		}
+		{
+			t_index_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, t_index.size());
+			auto ptr = t_index_buffer->map();
+			memcpy(ptr, t_index.data(), t_index.size() * sizeof(int3));
+			t_index_buffer->unmap();
+		}
+	}
+}
+
+VMesh::~VMesh() {
+	SAFE_RELEASE_OPTIX_OBJ(vert_buffer);
+	SAFE_RELEASE_OPTIX_OBJ(normal_buffer);
+	SAFE_RELEASE_OPTIX_OBJ(tex_buffer);
+	SAFE_RELEASE_OPTIX_OBJ(v_index_buffer);
+	SAFE_RELEASE_OPTIX_OBJ(n_index_buffer);
+	SAFE_RELEASE_OPTIX_OBJ(t_index_buffer);
+}
+
+VMesh * VMesh::Find(string name) {
+	auto pair = mesh_table.find(name);
+	if (pair != mesh_table.end()) {
+		return pair->second;
+	}
+	auto mat = new VMesh(name);
+	mesh_table[name] = mat;
+	return mat;
 }

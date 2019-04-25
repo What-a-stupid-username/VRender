@@ -6,6 +6,9 @@
 #include <regex>
 #include <sstream> 
 #include <set>
+#include "Support/objLoader.h"
+
+#define SAFE_RELEASE_OPTIX_OBJ(obj) if (obj != NULL) obj->destroy()
 
 class VMaterial;
 class VShader {
@@ -63,12 +66,36 @@ private:
 public:
 	static VMaterial* Find(string name);
 	static unordered_map<string, VMaterial*> GetAllMaterials();
-	static bool ApllyAllChanges();
+	static bool ApplyAllChanges();
 	static void ReloadMaterial(string name);
 };
 
-class VGeometry {
+
+
+
+class VGeometryFilter;
+class VMesh {
+	friend class VGeometryFilter;
+
+	Buffer vert_buffer = NULL;
+	Buffer normal_buffer = NULL;
+	Buffer tex_buffer = NULL;
+	Buffer v_index_buffer = NULL;
+	Buffer n_index_buffer = NULL;
+	Buffer t_index_buffer = NULL;
+
+	VMesh(string name);
+	~VMesh();
+
 public:
+	static VMesh* Find(string name);
+};
+
+
+
+class VGeometry {
+	friend class VGeometryFilter;
+private:
 	Program bound;
 	Program intersect;
 private:
@@ -91,19 +118,34 @@ private:
 public:
 	Handle<VariableObj> Visit(const char* varname);
 	inline void SetPrimitiveCount(size_t count) { this->geometry->setPrimitiveCount(count); }
+	void SetMesh(VMesh* mesh);
 };
 
 
-
+class OptiXLayer;
 class VTransform {
 	friend class VObject;
+	friend class OptiXLayer;
 	Group group = NULL;
 	Transform transform;
 
 	VTransform* parent = NULL;
+	VObject* object = NULL;
 	set<VTransform*> childs;
 
 	float3 pos, rotate, scale;
+
+	void ApplyPropertiesChange() {
+		Matrix4x4 mat;
+		mat = Matrix4x4::scale(scale);
+
+		mat = Matrix4x4::rotate(rotate.x / 180 * M_PI, make_float3(1, 0, 0)) * mat;
+		mat = Matrix4x4::rotate(rotate.y / 180 * M_PI, make_float3(0, 1, 0)) * mat;
+		mat = Matrix4x4::rotate(rotate.z / 180 * M_PI, make_float3(0, 0, 1)) * mat;
+
+		mat = Matrix4x4::translate(pos) * mat;
+		transform->setMatrix(false, mat.getData(), NULL);
+	}
 
 	VTransform();
 public:
@@ -111,35 +153,40 @@ public:
 
 	void AddChild(VTransform* trans);
 
+	inline set<VTransform*> Childs() { return childs; }
+	inline VObject* Object() { return object; }
+
 	static VTransform* Root();
 
 	void MarkDirty();
-
-	Group Group() { return group; }
-
+	
 	template<typename T>
 	T* Position() {
-		return <T*>&pos;
+		return (T*)&pos;
 	}
 	template<typename T>
 	T* Rotation() {
-		return <T*>&pos;
+		return (T*)&rotate;
 	}
 	template<typename T>
 	T* Scale() {
-		return <T*>&pos;
+		return (T*)&scale;
 	}
+
+	static bool ApplyAllChanges();
 };
 
 class VObject {
+public:
+	string name = "";
+private:
 	GeometryGroup hook;
+	GeometryInstance go;
 	VTransform* transform = NULL;
 	VMaterial* material = NULL;
 	VGeometryFilter* geometryFilter = NULL;
 	void RebindMaterial();
 	~VObject() { }
-public:
-	GeometryInstance go;
 public:
 	void MarkDirty() { transform->MarkDirty(); }
 	VObject(string geometry_shader_name);

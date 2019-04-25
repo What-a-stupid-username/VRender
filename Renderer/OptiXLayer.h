@@ -54,6 +54,8 @@ private:
 
 	CommandList cb;
 
+	function<void()> scene_func = nullptr;
+
 public:
 	bool pause = false;
 	float exposure = 3.f, gamma = 2.2f;
@@ -132,7 +134,7 @@ public:
 		Instance().Init();
 	}
 
-	static void LoadScene();
+	static void LoadScene(function<void()> func = nullptr);
 
 	inline static Camera& Camera() {
 		return Instance().camera;

@@ -1,3 +1,5 @@
+#define TINYOBJLOADER_IMPLEMENTATION
+
 #include <GlutEvent.h>
 
 #include <GUI.hpp>

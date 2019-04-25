@@ -486,9 +486,40 @@ private:
 		}
 		ImGui::Separator();
 
+		VTransform* root = VScene::root;
+
+		int index = 0;
+		if (root != NULL) {
+			for each (auto child in root->Childs())
+			{
+				DisplayNode(index, child);
+			}
+		}
 
 
 		ImGui::End();
+	}
+
+	void DisplayNode(int& gui_id, VTransform* trans) {
+		string name = trans->Object()->name;
+		name = name + "###" + to_string(gui_id);
+		if (ImGui::TreeNode(name.c_str())) {
+			bool changed = false;
+			changed |= ImGui::DragFloat3(("Position###pos_input" + to_string(gui_id)).c_str(), trans->Position<float>());
+			changed |= ImGui::DragFloat3(("Rotation###rot_input" + to_string(gui_id)).c_str(), trans->Rotation<float>());
+			changed |= ImGui::DragFloat3(("Scale###sca_input" + to_string(gui_id)).c_str(), trans->Scale<float>(),0.01, 0);
+			gui_id++;
+			if (changed) trans->MarkDirty();
+
+			for each (auto child in trans->Childs())
+			{
+				DisplayNode(gui_id, child);
+			}
+			ImGui::TreePop();
+		}
+		else {
+			gui_id++;
+		}
 	}
 
 

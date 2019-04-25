@@ -22,6 +22,8 @@ add_sample_executable(Renderer
 	Support/Scene.h
 	Support/Scene.cpp
 
+	Support/objLoader.h
+
 	resource.rc
 )
 
