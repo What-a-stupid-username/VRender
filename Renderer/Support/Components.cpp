@@ -1,7 +1,10 @@
 #include "Components.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "Support/stb_image.h"
 
 
 static unordered_map<string, VShader*> shader_cache;
+static unordered_map<string, VTexture*> texture_cache;
 static unordered_map<string, VMaterial*> material_table;
 static unordered_map<string, VGeometry*> geometry_cache;
 
@@ -246,7 +249,20 @@ void VMaterial::ApplyPropertiesChange() {
 	if (!mat) return;
 	for each (auto pair in properties)
 	{
-		pair.second.SetProperty(mat, pair.first);
+		if (pair.second.Type() == "string") {
+			int k1 = pair.first.find('|');
+			if (k1 != -1) {
+				string special_type = pair.first.substr(0, k1);
+				string name = pair.first.substr(k1 + 1, pair.first.length() - k1 - 1);
+				if (special_type == "Texture") {
+					int id = VTexture::Find(*pair.second.GetData<string>())->sampler->getId();
+					mat[name]->setUserData(sizeof(int), (void*)&id);
+				}
+			}			
+		}
+		else {
+			pair.second.SetProperty(mat, pair.first);
+		}
 	}
 	SetShaderAsShaderProperties();
 }
@@ -554,4 +570,81 @@ VMesh * VMesh::Find(string name) {
 	auto mat = new VMesh(name);
 	mesh_table[name] = mat;
 	return mat;
+}
+
+Buffer default_tex = NULL;
+TextureSampler default_tex_sampler = NULL;
+
+VTexture::VTexture(string path) {
+	auto& context = OptiXLayer::Context();
+
+
+	if (path == "") {
+		if (default_tex == NULL) {
+			default_tex = context->createBuffer(RT_BUFFER_INPUT);
+			default_tex->setFormat(RT_FORMAT_UNSIGNED_BYTE4);
+			default_tex->setSize(1, 1);
+
+			default_tex_sampler = context->createTextureSampler();
+			default_tex_sampler->setWrapMode(0, RT_WRAP_CLAMP_TO_EDGE);
+			default_tex_sampler->setWrapMode(1, RT_WRAP_CLAMP_TO_EDGE);
+			default_tex_sampler->setFilteringModes(RT_FILTER_LINEAR, RT_FILTER_LINEAR, RT_FILTER_NONE);
+			default_tex_sampler->setReadMode(RT_TEXTURE_READ_ELEMENT_TYPE);
+			default_tex_sampler->setMaxAnisotropy(1);
+			default_tex_sampler->setMipLevelClamp(0, 1);
+			default_tex_sampler->setArraySize(1);
+			default_tex_sampler->setBuffer(default_tex);
+		}
+		sampler = default_tex_sampler;
+	}
+	else {
+		buffer = context->createBuffer(RT_BUFFER_INPUT);
+		int w, h, n;
+		auto img = stbi_load((string(sutil::samplesDir()) + "/Textures/" + path).c_str(), &w, &h, &n, STBI_rgb_alpha);
+
+		n = 4;
+		buffer->setFormat(RT_FORMAT_UNSIGNED_BYTE4);
+		
+		buffer->setSize(w, h);
+
+		char* ptr = (char*)buffer->map();
+
+		memcpy(ptr, img, sizeof(unsigned char) * n * w * h);
+
+		delete(img);
+		buffer->unmap();
+
+		sampler = context->createTextureSampler();
+		sampler->setWrapMode(0, RT_WRAP_CLAMP_TO_EDGE);
+		sampler->setWrapMode(1, RT_WRAP_CLAMP_TO_EDGE);
+		sampler->setFilteringModes(RT_FILTER_LINEAR, RT_FILTER_LINEAR, RT_FILTER_NONE);
+		regex r(".sRGB");
+		sregex_iterator it(path.begin(), path.end(), r);
+		sregex_iterator end;
+		bool sRGB = (it != end);
+		if (sRGB)
+			sampler->setReadMode(RT_TEXTURE_READ_NORMALIZED_FLOAT_SRGB);
+		else
+			sampler->setReadMode(RT_TEXTURE_READ_NORMALIZED_FLOAT);
+		sampler->setMaxAnisotropy(1);
+		sampler->setMipLevelClamp(0, 1);
+		sampler->setArraySize(1);
+		sampler->setBuffer(buffer);
+	}
+
+}
+
+VTexture::~VTexture() {
+	SAFE_RELEASE_OPTIX_OBJ(buffer);
+	if (sampler != default_tex_sampler && sampler != NULL) sampler->destroy();
+}
+
+VTexture * VTexture::Find(string path) {
+	auto pair = texture_cache.find(path);
+	if (pair != texture_cache.end()) {
+		return pair->second;
+	}
+	auto tex = new VTexture(path);
+	texture_cache[path] = tex;
+	return tex;
 }

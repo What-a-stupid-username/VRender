@@ -31,6 +31,24 @@ public:
 	static unordered_map<string, VShader*> GetAllShaders();
 };
 
+
+class VMaterial;
+class VTexture {
+	friend class VMaterial;
+	Buffer buffer = NULL;
+	TextureSampler sampler = NULL;
+
+	VTexture(string path);
+	~VTexture();
+
+public:
+	static VTexture* Find(string path);
+};
+
+
+
+
+
 class VObject;
 class VMaterial {
 	friend class VObject;
@@ -200,3 +218,4 @@ void VMaterial::ChangeProperty(string name, T value) {
 	*(T*)properties[name].data = value;
 	MarkDirty();
 }
+

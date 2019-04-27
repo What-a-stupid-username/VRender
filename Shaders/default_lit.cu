@@ -18,6 +18,11 @@ rtDeclareVariable(float,		smoothness, , ) = 0.f;
 rtDeclareVariable(float,		refraction_index, , ) = 1.5f;
 
 
+rtDeclareVariable(rtTextureId, baseColorTex, , ) = NULL;
+rtDeclareVariable(rtTextureId, metallicTex, , ) = NULL;
+rtDeclareVariable(rtTextureId, normalTex, , ) = NULL;
+rtDeclareVariable(rtTextureId, roughnessTex, , ) = NULL;
+
 rtDeclareVariable(float3,		geometric_normal,	attribute geometric_normal, );
 rtDeclareVariable(float3,		shading_normal,		attribute shading_normal, );
 rtDeclareVariable(float3,		texcoord,			attribute texcoord, );
@@ -28,6 +33,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 {
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
+    //float shading_normal = normalTex == 0 ? world_shading_normal : world_shading_normal * ;
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
 
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
@@ -40,15 +46,14 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 	// initialize surface info
 	SurfaceInfo IN;
-	IN.baseColor = albedo;
+	IN.baseColor = baseColorTex == 0 ? albedo : make_float3(tex2D<float4>(baseColorTex, texcoord.x, texcoord.y));
 	IN.transparent = transparent;
-	IN.metallic = metallic;
-	IN.smoothness = smoothness;
+	IN.metallic = metallicTex == 0 ? metallic : tex2D<float4>(metallicTex, texcoord.x, texcoord.y).x;
+	IN.smoothness = roughnessTex == 0 ? smoothness : 1 - tex2D<float4>(roughnessTex, texcoord.x, texcoord.y).x;
 	IN.normal = ffnormal;
+	//current_prd.radiance = make_float3(IN.metallic); return;
 	
 	int in_to_out = dot(ray.direction, world_geometric_normal) > 0;
-
-
 
 	float3 a;
 	float b;
