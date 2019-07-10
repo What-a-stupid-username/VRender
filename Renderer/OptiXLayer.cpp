@@ -2,55 +2,6 @@
 #include "Support/Components.h"
 #include "Support/Scene.h"
 
-Program        pgram_intersection = 0;
-Program        pgram_bounding_box = 0;
-
-void setMaterial(
-	GeometryInstance& gi,
-	Material material,
-	const std::string& color_name,
-	const float3& color)
-{
-	gi->addMaterial(material);
-	gi[color_name]->setFloat(color);
-}
-void setMaterial(
-	GeometryInstance& gi,
-	Material material,
-	const std::string& color_name,
-	const float& color)
-{
-	gi->addMaterial(material);
-	gi[color_name]->setFloat(color);
-}
-
-GeometryInstance createParallelogram(Context context,
-	const float3& anchor,
-	const float3& offset1,
-	const float3& offset2)
-{
-	Geometry parallelogram = context->createGeometry();
-	parallelogram->setPrimitiveCount(1u);
-	parallelogram->setIntersectionProgram(pgram_intersection);
-	parallelogram->setBoundingBoxProgram(pgram_bounding_box);
-
-	float3 normal = normalize(cross(offset1, offset2));
-	float d = dot(normal, anchor);
-	float4 plane = make_float4(normal, d);
-
-	float3 v1 = offset1 / dot(offset1, offset1);
-	float3 v2 = offset2 / dot(offset2, offset2);
-
-	parallelogram["plane"]->setFloat(plane);
-	parallelogram["anchor"]->setFloat(anchor);
-	parallelogram["v1"]->setFloat(v1);
-	parallelogram["v2"]->setFloat(v2);
-
-	GeometryInstance gi = context->createGeometryInstance();
-	gi->setGeometry(parallelogram);
-	return gi;
-}
-
 bool Camera::UpdateOptiXContext(Context context, float width, float height, bool fource) {
 	try
 	{
@@ -112,9 +63,9 @@ bool Camera::UpdateOptiXContext(Context context, float width, float height, bool
 }
 
 Camera::Camera() {
-	camera_eye = make_float3(278.0f, 273.0f, -900.0f);
-	camera_lookat = make_float3(278.0f, 273.0f, 0.0f);
-	camera_up = make_float3(0.0f, 1.0f, 0.0f);
+	camera_eye = make_float3(0, 0, -21);
+	camera_lookat = make_float3(0, 0, 0);
+	camera_up = make_float3(0, 1, 0);
 
 	camera_rotate = Matrix4x4::identity();
 }
@@ -122,9 +73,16 @@ Camera::Camera() {
 void OptiXLayer::Init() {
 	try
 	{
+#ifdef FORCE_NOT_USE_RTX
+		int not_use_rtx = 0;
+		rtGlobalSetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX, sizeof(int), (void*)& not_use_rtx);
+#endif // FOURCE_NOT_USE_RTX
+
+
 		context = Context::create();
 		context->setRayTypeCount(3);
 		context->setEntryPointCount(2);
+
 		context->setStackSize(2000);
 
 
@@ -226,6 +184,8 @@ void OptiXLayer::LoadScene(function<void()> func) {
 
 	auto& context = Context();
 
+	VScene::root->group->validate();
+
 	context["top_shadower"]->set(VScene::root->group);
 
 	context["top_object"]->set(VScene::root->group);
@@ -249,7 +209,9 @@ void OptiXLayer::RenderResult(uint maxFrame) {
 		layer.context["rnd_seed"]->setUint(rand());
 		layer.context["diffuse_strength"]->setFloat(layer.diffuse_strength);
 		layer.context["max_depth"]->setInt(layer.max_depth);
-		//layer.context->setMaxTraceDepth(layer.max_depth+1);//only work with optix6.0.0+, if you get an error here, just commented out this
+#ifdef OPTIX_6
+		layer.context->setMaxTraceDepth(layer.max_depth + 2);
+#endif // OPTIX_6
 		layer.context["cut_off_high_variance_result"]->setUint(layer.cut_off_high_variance_result);
 		layer.context["sqrt_num_samples"]->setUint(layer.sqrt_num_samples);
 		Variable(layer.tonemapStage->queryVariable("exposure"))->setFloat(layer.exposure);

@@ -23,8 +23,21 @@
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
+#include <functional>
 
 #include "VDebug.h"
 
 using namespace optix;
 using namespace std;
+
+//this define only exist in optix6.0+
+#ifdef rtMarkedCallableProgramId
+
+#define OPTIX_6
+
+#endif
+
+
+//Use this to shut down the RTCore.
+//Currently, RTCore can't support change the count of the Intersection Program in runtime...Shut down it to fix a bug in develop mode.
+#define FORCE_NOT_USE_RTX

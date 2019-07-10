@@ -2342,7 +2342,7 @@ namespace tinyobj {
 					// 'g' with empty names
 					if (warn) {
 						std::stringstream ss;
-						ss << "Empty group name. line: " << line_num << "\n";
+						//ss << "Empty group name. line: " << line_num << "\n";
 						(*warn) += ss.str();
 						name = "";
 					}

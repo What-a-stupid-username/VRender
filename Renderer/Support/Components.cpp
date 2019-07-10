@@ -122,6 +122,7 @@ unordered_map<string, VShader*> VShader::GetAllShaders() {
 }
 
 VGeometry::VGeometry(string name) {
+	this->name = name;
 	auto& context = OptiXLayer::Context();
 	// Set up parallelogram programs
 	string all_contain;
@@ -157,6 +158,16 @@ VGeometry::VGeometry(string name) {
 			k++;
 		}
 		if (k != 1) throw Exception("More than one intersect pragma founded in " + name);
+	}
+}
+
+void VGeometry::Release() {
+	ref_cout--;
+	if (ref_cout <= 0) {
+		bound->destroy();
+		intersect->destroy();
+		geometry_cache.erase(name);
+		delete(this);
 	}
 }
 
@@ -200,7 +211,7 @@ VMaterial::VMaterial(string name) {
 
 void VMaterial::ReloadShader() {
 	if (shader_name == "") return;
-	if (mat) mat->destroy();
+	SAFE_RELEASE_OPTIX_OBJ(mat);
 	mat = OptiXLayer::Context()->createMaterial();
 	auto shader = VShader::Find(shader_name);
 	for each (auto pair in shader->closestHitProgram)
@@ -213,14 +224,22 @@ void VMaterial::ReloadShader() {
 	MarkDirty();
 }
 
-void VMaterial::Release() {
-	if (reference.size() != 0) throw Exception("reference is not zero!");
-	VShader::Find(shader_name)->reference.erase(this);
+void VMaterial::Release(VObject* obj) {
+	reference.erase(obj);
+	if (reference.size() != 0) return;
+	auto shader = VShader::Find(shader_name);
+	shader->reference.erase(this);
+	if (shader->reference.empty()) {
+		shader->Release();
+		shader_cache.erase(shader_name);
+		delete(shader);
+	}
 	for each (auto pair in properties) {
 		pair.second.Release();
 	}
 	properties.clear();
-	name = shader_name = "";
+	material_table.erase(name);
+	delete(this);
 }
 
 void VMaterial::Reload(string name) {
@@ -284,6 +303,22 @@ void VMaterial::MarkDirty() {
 
 const static float indentity[16]{ 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1 };
 
+void VTransform::ApplyPropertiesChange() {
+	Matrix4x4 mat;
+	mat = Matrix4x4::scale(scale);
+
+	mat = Matrix4x4::rotate(rotate.x / 180 * M_PI, make_float3(1, 0, 0)) * mat;
+	mat = Matrix4x4::rotate(rotate.y / 180 * M_PI, make_float3(0, 1, 0)) * mat;
+	mat = Matrix4x4::rotate(rotate.z / 180 * M_PI, make_float3(0, 0, 1)) * mat;
+
+	mat = Matrix4x4::translate(pos) * mat;
+	transform->setMatrix(false, mat.getData(), NULL);
+	if (group != NULL) {
+		auto k = group->getAcceleration();
+		k->markDirty();
+	}
+}
+
 VTransform::VTransform() {
 	auto& context = OptiXLayer::Context();
 	transform = context->createTransform();
@@ -302,7 +337,8 @@ void VTransform::Setparent(VTransform * trans) {
 		if (parent == Root()) parent->group->removeChild(transform);
 	}
 	parent = trans;
-	if (parent == Root()) parent->group->addChild(transform);
+	if (parent == Root()) 
+		parent->group->addChild(transform);
 	parent->childs.insert(this);
 }
 
@@ -326,6 +362,28 @@ void VTransform::MarkDirty() {
 	}
 }
 
+void VTransform::Release() {
+	for each (auto child in childs)
+	{
+		child->Release();
+		delete(child);
+	}
+	childs.clear();
+	if (object != NULL) {
+		delete(object);
+		object = NULL;
+	}
+
+	if (group) {
+		SAFE_RELEASE_OPTIX_OBJ(group->getAcceleration());
+		SAFE_RELEASE_OPTIX_OBJ(group);
+	}
+	else {
+		SAFE_RELEASE_OPTIX_OBJ(transform);
+	}
+	SAFE_RELEASE_OPTIX_OBJ(group);
+}
+
 bool VTransform::ApplyAllChanges() {
 	bool res = false;
 	if (transform_change_table.size()) res = true;
@@ -342,6 +400,7 @@ VGeometryFilter::VGeometryFilter(VGeometry * geometry) {
 	auto& context = OptiXLayer::Context();
 	this->geometry = context->createGeometry();
 	geometry_shader = geometry;
+	geometry->ref_cout++;
 	this->geometry->setBoundingBoxProgram(geometry_shader->bound);
 	this->geometry->setIntersectionProgram(geometry_shader->intersect);
 	this->geometry->setPrimitiveCount(1u);
@@ -354,12 +413,17 @@ Handle<VariableObj> VGeometryFilter::Visit(const char * varname)
 }
 
 void VGeometryFilter::SetMesh(VMesh * mesh) {
+	if (this->mesh != NULL) {
+		this->mesh->Release();
+	}
+	this->mesh = mesh;
+	mesh->ref_cout++;
+
 	object->MarkDirty();
 
 	geometry["vertex_buffer"]->setBuffer(mesh->vert_buffer);
 	geometry["v_index_buffer"]->setBuffer(mesh->v_index_buffer);
-
-
+	
 	if (float3_default == NULL) {
 		float3_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, 0);
 		int3_default = OptiXLayer::Context()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, 0);
@@ -430,6 +494,8 @@ unordered_map<string, VMesh*> mesh_table;
 VMesh::VMesh(string name) {
 	int k = name.find_last_of('.');
 	if (k == -1) throw Exception("ERROR mesh name.");
+
+	this->name = name;
 
 	string format = name.substr(k, name.length() - k);
 
@@ -560,6 +626,19 @@ VMesh::~VMesh() {
 	SAFE_RELEASE_OPTIX_OBJ(v_index_buffer);
 	SAFE_RELEASE_OPTIX_OBJ(n_index_buffer);
 	SAFE_RELEASE_OPTIX_OBJ(t_index_buffer);
+}
+
+void VMesh::Release() {
+	ref_cout--;
+	if (ref_cout <= 0) {
+		SAFE_RELEASE_OPTIX_OBJ(vert_buffer);
+		SAFE_RELEASE_OPTIX_OBJ(normal_buffer);
+		SAFE_RELEASE_OPTIX_OBJ(tex_buffer);
+		SAFE_RELEASE_OPTIX_OBJ(v_index_buffer);
+		SAFE_RELEASE_OPTIX_OBJ(n_index_buffer);
+		SAFE_RELEASE_OPTIX_OBJ(t_index_buffer);
+		mesh_table.erase(name);
+	}
 }
 
 VMesh * VMesh::Find(string name) {

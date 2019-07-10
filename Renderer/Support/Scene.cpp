@@ -1,10 +1,14 @@
 #include "Components.h"
 #include "Scene.h"
 
-VTransform* VScene::root;
+VTransform* VScene::root = NULL;
 string VScene::scene_path;
 
 void VScene::LoadCornell() {
+	
+	if (root != NULL) {
+		root->Release();
+	}
 
 	auto& layer = OptiXLayer::Instance();
 
@@ -14,9 +18,9 @@ void VScene::LoadCornell() {
 		// Light buffer
 		const float3 light_em = make_float3(15, 15, 15);
 		ParallelogramLight light;
-		light.corner = make_float3(343.0f, 548.6f, 227.0f);
-		light.v1 = make_float3(0.0f, 0.0f, 105.0f);
-		light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
+		light.corner = make_float3(1, 5, 1);
+		light.v1 = make_float3(0, 0, 2);
+		light.v2 = make_float3(-2, 0, 0);
 		light.normal = normalize(cross(light.v1, light.v2));
 		light.emission = light_em;
 
@@ -38,8 +42,12 @@ void VScene::LoadCornell() {
 
 		class Foo {
 		public:
-			static VObject* foo(float3& anchor, float3& offset1, float3& offset2, string material = "default") {
-				VObject* obj = new VObject("parallelogram");
+			static VObject* foo(float3 position, float3 rotation, float3 scale, string material = "default") {
+				float3 anchor = make_float3(-5, 0, -5);
+				float3 offset1 = make_float3(0, 0, 10);
+				float3 offset2 = make_float3(10, 0, 0);
+
+				VObject * obj = new VObject("parallelogram");
 
 				float3 normal = normalize(cross(offset1, offset2));
 				float d = dot(normal, anchor);
@@ -54,48 +62,42 @@ void VScene::LoadCornell() {
 				obj->GeometryFilter()->Visit("v2")->setFloat(v2);
 
 				obj->SetMaterial(VMaterial::Find(material));
+
+				*obj->Transform()->Position<float3>() = position;
+				*obj->Transform()->Rotation<float3>() = rotation;
+				*obj->Transform()->Scale<float3>() = scale;
+				return obj;
+			}
+			static VObject * foo2(float3 position, float3 rotation, float3 scale, string material = "default") {
+				VObject *obj = new VObject("triangle_mesh");
+
+				obj->GeometryFilter()->SetMesh(VMesh::Find("Cube.obj"));
+
+				obj->SetMaterial(VMaterial::Find(material));
+
+				*obj->Transform()->Position<float3>() = position;
+				*obj->Transform()->Rotation<float3>() = rotation;
+				*obj->Transform()->Scale<float3>() = scale;
 				return obj;
 			}
 		};
 		// Floor
-		Foo::foo(make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), make_float3(556.0f, 0.0f, 0.0f));
+		Foo::foo(make_float3(0, -5, 0), make_float3(0, 0, 0), make_float3(1, 1, 1))->name = "Floor";
 		// Ceiling
-		Foo::foo(make_float3(0.0f, 548.8f, 0.0f), make_float3(556.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f));
+		Foo::foo(make_float3(0, 5, 0), make_float3(-180, 0, 0), make_float3(1, 1, 1))->name = "Ceiling";
 		// Back wall
-		Foo::foo(make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), make_float3(556.0f, 0.0f, 0.0f), "default_feb");
+		Foo::foo(make_float3(0, 0, 5), make_float3(-90, 0, 0), make_float3(1, 1, 1), "default_feb")->name = "Back wall";
 		// Right wall
-		Foo::foo(make_float3(0.0f, 0.0f, 0.0f), make_float3(0.0f, 548.8f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), "default_blue");
-		// Left wall
-		Foo::foo(make_float3(556.0f, 0.0f, 0.0f), make_float3(0.0f, 0.0f, 559.2f), make_float3(0.0f, 548.8f, 0.0f), "default_red");
-		// Short block
-		Foo::foo(make_float3(130.0f, 165.0f, 65.0f), make_float3(-48.0f, 0.0f, 160.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
-		Foo::foo(make_float3(290.0f, 0.0f, 114.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-50.0f, 0.0f, 158.0f), "default_transparent");
-		Foo::foo(make_float3(130.0f, 0.0f, 65.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(160.0f, 0.0f, 49.0f), "default_transparent");
-		Foo::foo(make_float3(82.0f, 0.0f, 225.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(48.0f, 0.0f, -160.0f), "default_transparent");
-		Foo::foo(make_float3(240.0f, 0.0f, 272.0f), make_float3(0.0f, 165.0f, 0.0f), make_float3(-158.0f, 0.0f, -47.0f), "default_transparent");
-
-		//// Tall block
-		Foo::foo(make_float3(423.0f, 330.0f, 247.0f), make_float3(-158.0f, 0.0f, 49.0f), make_float3(49.0f, 0.0f, 159.0f), "default_mirror");
-		Foo::foo(make_float3(423.0f, 0.0f, 247.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(49.0f, 0.0f, 159.0f), "default_mirror");
-		Foo::foo(make_float3(472.0f, 0.0f, 406.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(-158.0f, 0.0f, 50.0f), "default_mirror");
-		Foo::foo(make_float3(314.0f, 0.0f, 456.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(-49.0f, 0.0f, -160.0f), "default_mirror");
-		Foo::foo(make_float3(265.0f, 0.0f, 296.0f), make_float3(0.0f, 330.0f, 0.0f), make_float3(158.0f, 0.0f, -49.0f), "default_mirror");
-
+		Foo::foo(make_float3(-5,0,0), make_float3(0, 0, -90), make_float3(1, 1, 1), "default_blue")->name = "Right wall";
+		 //Left wall
+		Foo::foo(make_float3(5, 0, 0), make_float3(0, 0, 90), make_float3(1, 1, 1), "default_red")->name = "Left wall";
+	
 		//Light
-		Foo::foo(make_float3(343.0f, 548.6f, 227.0f), make_float3(0.0f, 0.0f, 105.0f), make_float3(-130.0f, 0.0f, 0.0f), "light");
+		Foo::foo(make_float3(0, 4.999, 0), make_float3(-180, 0, 0), make_float3(0.2, 0.2, 0.2), "light")->name = "Light wall";
 
-		//VObject* obj = new VObject("triangle_mesh");
-		//VMesh* mesh = VMesh::Find("Test1.OBJ");
-		//obj->GeometryFilter()->SetMesh(mesh);
-		//obj->SetMaterial(VMaterial::Find("default"));
+		Foo::foo2(make_float3(1.7, -2, 2), make_float3(0, 18, 0), make_float3(3, 6, 3), "default_mirror")->name = "tall box";
 
-
-		//float3 center = make_float3(240.0f, 240.0f, 240.0f);
-		//float3 scale = make_float3(2, 2, 2);
-		//float3 rota = make_float3(0, 90, 0);
-		//*obj->Transform()->Position<float3>() = center;
-		//*obj->Transform()->Scale<float3>() = scale;
-		//*obj->Transform()->Rotation<float3>() = rota;
+		Foo::foo2(make_float3(-2, -3.5, -1), make_float3(0, 0, 0), make_float3(3, 3, 3), "default_transparent")->name = "short box";
 
 		root = VTransform::Root();
 	}

@@ -1,4 +1,5 @@
 string:Shader:default_lit
-float:smoothness:1
-string:Texture|baseColorTex:baseColor.sRGB.bmp
-string:Texture|metallicTex:metallic.sRGB.bmp
+float3:albedo:1,1,1
+float:metallic:0
+float:smoothness:0
+float:transparent:1

@@ -8,9 +8,13 @@
 #include <set>
 #include "Support/objLoader.h"
 
-#define SAFE_RELEASE_OPTIX_OBJ(obj) if (obj != NULL) obj->destroy()
+#define SAFE_RELEASE_OPTIX_OBJ(obj) if (obj != NULL) { obj->destroy(); obj = NULL; }
 
+class OptiXLayer;
 class VMaterial;
+class VGeometryFilter;
+class VObject;
+
 class VShader {
 	friend class VMaterial;
 	unordered_map<VMaterial*, function<void()>> reference;
@@ -32,7 +36,6 @@ public:
 };
 
 
-class VMaterial;
 class VTexture {
 	friend class VMaterial;
 	Buffer buffer = NULL;
@@ -49,9 +52,9 @@ public:
 
 
 
-class VObject;
 class VMaterial {
 	friend class VObject;
+	friend class VTransform;
 private:
 	string name;
 	string shader_name;
@@ -65,7 +68,7 @@ private:
 	~VMaterial() {}
 	VMaterial(string name);
 	void ReloadShader();
-	void Release();
+	void Release(VObject* obj);
 	void Reload(string name);
 	void SetShaderAsShaderProperties();
 public:
@@ -91,9 +94,12 @@ public:
 
 
 
-class VGeometryFilter;
 class VMesh {
 	friend class VGeometryFilter;
+
+	int ref_cout = 0;
+
+	string name;
 
 	Buffer vert_buffer = NULL;
 	Buffer normal_buffer = NULL;
@@ -104,7 +110,7 @@ class VMesh {
 
 	VMesh(string name);
 	~VMesh();
-
+	void Release();
 public:
 	static VMesh* Find(string name);
 };
@@ -114,38 +120,46 @@ public:
 class VGeometry {
 	friend class VGeometryFilter;
 private:
+	int ref_cout = 0;
+	string name;
 	Program bound;
 	Program intersect;
 private:
 	VGeometry() {}
 	VGeometry(string name);
-
+	void Release();
 public:
 	static VGeometry* Find(string name);
 };
 
-
-class VObject;
+//todo: Move to GeometryTriangles to get higher acceleration rate on RTX boards
 class VGeometryFilter {
 	friend class VObject;
+	friend class VTransform;
 private:
 	Geometry geometry;
 	VGeometry* geometry_shader = NULL;
 	VObject* object = NULL;
-	VGeometryFilter(VGeometry* geometry);
+	VMesh* mesh = NULL;
+	VGeometryFilter(VGeometry* geometry = NULL);
+	void Release() {
+		if (mesh) mesh->Release();
+		geometry->destroy();
+		geometry_shader->Release();
+	}
 public:
 	Handle<VariableObj> Visit(const char* varname);
 	inline void SetPrimitiveCount(size_t count) { this->geometry->setPrimitiveCount(count); }
 	void SetMesh(VMesh* mesh);
 };
 
-
-class OptiXLayer;
 class VTransform {
+public:
 	friend class VObject;
 	friend class OptiXLayer;
+
 	Group group = NULL;
-	Transform transform;
+	Transform transform = NULL;
 
 	VTransform* parent = NULL;
 	VObject* object = NULL;
@@ -153,17 +167,7 @@ class VTransform {
 
 	float3 pos, rotate, scale;
 
-	void ApplyPropertiesChange() {
-		Matrix4x4 mat;
-		mat = Matrix4x4::scale(scale);
-
-		mat = Matrix4x4::rotate(rotate.x / 180 * M_PI, make_float3(1, 0, 0)) * mat;
-		mat = Matrix4x4::rotate(rotate.y / 180 * M_PI, make_float3(0, 1, 0)) * mat;
-		mat = Matrix4x4::rotate(rotate.z / 180 * M_PI, make_float3(0, 0, 1)) * mat;
-
-		mat = Matrix4x4::translate(pos) * mat;
-		transform->setMatrix(false, mat.getData(), NULL);
-	}
+	void ApplyPropertiesChange();
 
 	VTransform();
 public:
@@ -191,10 +195,13 @@ public:
 		return (T*)&scale;
 	}
 
+	void Release();
+
 	static bool ApplyAllChanges();
 };
 
 class VObject {
+	friend class VTransform;
 public:
 	string name = "";
 private:
@@ -204,7 +211,13 @@ private:
 	VMaterial* material = NULL;
 	VGeometryFilter* geometryFilter = NULL;
 	void RebindMaterial();
-	~VObject() { }
+	~VObject() {
+		hook->getAcceleration()->destroy();
+		hook->destroy();
+		if (material != NULL) material->Release(this);
+		geometryFilter->Release();
+		go->destroy();
+	}
 public:
 	void MarkDirty() { transform->MarkDirty(); }
 	VObject(string geometry_shader_name);
