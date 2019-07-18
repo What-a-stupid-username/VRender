@@ -28,8 +28,8 @@ rtDeclareVariable(uint2,         launch_index, rtLaunchIndex, );
 rtDeclareVariable(PerRayData_pathtrace, current_prd, rtPayload, );
 
 
-rtDeclareVariable(unsigned int, common_ray_type, , );
-rtDeclareVariable(unsigned int, pathtrace_shadow_ray_type, , );
+rtDeclareVariable(unsigned int, pathtrace_common_ray_type, , ) = 0;
+rtDeclareVariable(unsigned int, pathtrace_shadow_ray_type, , ) = 1;
 
 
 rtDeclareVariable(unsigned int, rnd_seed, , );
@@ -40,3 +40,4 @@ rtDeclareVariable(int, max_depth, , );
 rtBuffer<ParallelogramLight>     lights;
 
 rtDeclareVariable(float3, bg_color, , );
+rtDeclareVariable(float3, bad_color, , );

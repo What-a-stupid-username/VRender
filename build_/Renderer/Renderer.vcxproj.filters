@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\main.cpp" />
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\OptiXLayer.cpp" />
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Basic.cpp">
+      <Filter>Support</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Components.cpp">
+      <Filter>Support</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Scene.cpp">
+      <Filter>Support</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\stb_image.cpp">
+      <Filter>Support</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\CommonInclude.h" />
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\VDebug.h" />
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\OptiXLayer.h" />
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\GlutEvent.h" />
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\GUI.hpp" />
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Basic.h">
+      <Filter>Support</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Components.h">
+      <Filter>Support</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\Scene.h">
+      <Filter>Support</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\objLoader.h">
+      <Filter>Support</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\hjk\Desktop\VRender\Renderer\Support\stb_image.h">
+      <Filter>Support</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\hjk\Desktop\VRender\Renderer\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="C:\Users\hjk\Desktop\VRender\Renderer\resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Support">
+      <UniqueIdentifier>{EB28A419-01D8-3EAE-A5A8-1D4873278E16}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

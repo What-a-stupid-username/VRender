@@ -6,18 +6,18 @@
 //
 //-----------------------------------------------------------------------------
 
-rtDeclareVariable(float3,        eye, , );
-rtDeclareVariable(float3,        U, , );
-rtDeclareVariable(float3,        V, , );
-rtDeclareVariable(float3,        W, , );
-rtDeclareVariable(float3,        bad_color, , );
-rtDeclareVariable(unsigned int,  frame_number, , );
-rtDeclareVariable(unsigned int, sqrt_num_samples, , );
-rtDeclareVariable(unsigned int, cut_off_high_variance_result, , );
+rtDeclareVariable(float3,			camera_position, , );
+rtDeclareVariable(float3,			camera_up, , );
+rtDeclareVariable(float3,			camera_forward, , );
+rtDeclareVariable(float3,			camera_right, , );
+rtDeclareVariable(float2,			camera_fov, , );
+rtDeclareVariable(unsigned int,		camera_staticFrameNum, , );
+rtDeclareVariable(unsigned int,		sqrt_num_samples, , ) = 2;
+rtDeclareVariable(unsigned int,		cut_off_high_variance_result, , ) = 0;
 
 
-rtBuffer<float4, 2>              output_buffer;
-rtBuffer<float4, 2>              helper_buffer;
+rtBuffer<float4, 2>              V_TARGET0;
+rtBuffer<float4, 2>              V_TARGET1;
 
 
 inline float distance2(const float3& a, const float3& b) {
@@ -28,16 +28,16 @@ inline float distance2(const float3& a, const float3& b) {
 
 
 
-RT_PROGRAM void path_tracer_camera()
+RT_PROGRAM void dispatch()
 {
-	float3 last_color_result = make_float3(output_buffer[launch_index]);
-	float last_varient = frame_number > 100 ? helper_buffer[launch_index].x : 1;
+	float3 last_color_result = make_float3(V_TARGET0[launch_index]);
+	float last_varient = camera_staticFrameNum > 100 ? V_TARGET1[launch_index].x : 1;
 
-    uint2 screen = make_uint2(output_buffer.size().x, output_buffer.size().y);
+    uint2 screen = make_uint2(V_TARGET0.size().x, V_TARGET0.size().y);
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
     float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
 
-	unsigned int seed = tea<16>(screen.x*launch_index.y + launch_index.x + rnd_seed, frame_number);
+	unsigned int seed = tea<16>(screen.x*launch_index.y + launch_index.x + rnd_seed, camera_staticFrameNum);
 	float z = rnd(seed);
 
 	int actrual_sqrt_sample_num = sqrt_num_samples;
@@ -58,9 +58,10 @@ RT_PROGRAM void path_tracer_camera()
         float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
         float2 d = pixel + jitter*jitter_scale;
 		
-		float3 ray_origin = eye/* + eye_jit*/;
-        float3 ray_direction = normalize(d.x*U + d.y*V + W);
+		float3 ray_origin = camera_position/* + eye_jit*/;
+        float3 ray_direction = normalize(d.x * camera_right * camera_fov.y + d.y * camera_up * camera_fov.x + camera_forward);
 
+		//V_TARGET0[launch_index] = make_float4(d.x, d.y, 0, 1.0f); return;
         // Initialze per-ray data
         PerRayData_pathtrace prd;
         prd.countEmitted = true;
@@ -69,7 +70,7 @@ RT_PROGRAM void path_tracer_camera()
 		prd.radiance = make_float3(0);
 		prd.importance = last_varient;
 
-        Ray ray = make_Ray(ray_origin, ray_direction, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+        Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
 
@@ -92,34 +93,18 @@ RT_PROGRAM void path_tracer_camera()
 	varient_result = min(max(varient_result, 0.4f), 1.f);
     color_result /= samples_per_pixel;
 
-	//output_buffer[launch_index] = make_float4(0,0,0,1);
-    if (frame_number > 1)
+	//V_TARGET0[launch_index] = make_float4(0,0,0,1);
+    if (camera_staticFrameNum > 1)
     {
-		float a = 1.0f / (float)frame_number;
-        output_buffer[launch_index] = make_float4( lerp(last_color_result, color_result, a), 1.0f );
+		float a = 1.0f / (float)camera_staticFrameNum;
+        V_TARGET0[launch_index] = make_float4( lerp(last_color_result, color_result, a), 1.0f );
+		V_TARGET1[launch_index] = make_float4(lerp(last_varient, varient_result, a));
     }
     else
     {
-        output_buffer[launch_index] = make_float4(color_result, 1.0f);
+        V_TARGET0[launch_index] = make_float4(color_result, 1.0f);
+		V_TARGET1[launch_index] = make_float4(varient_result);
     }
-
-	if (frame_number < 100) {
-		if (frame_number > 1)
-		{
-			float a = 1.0f / (float)frame_number;
-			helper_buffer[launch_index] = make_float4(lerp(helper_buffer[launch_index].x, varient_result, a), 0, 0, 0);
-		}
-		else
-		{
-			helper_buffer[launch_index] = make_float4(varient_result, 0, 0, 0);
-		}
-		//float4 vv = helper_buffer[min(max(launch_index + make_uint2(0, 1), make_uint2(0)), screen - make_uint2(1))] * 0.025 +
-		//	helper_buffer[min(max(launch_index + make_uint2(0, -1), make_uint2(0)), screen - make_uint2(1))] * 0.025 +
-		//	helper_buffer[min(max(launch_index + make_uint2(1, 0), make_uint2(0)), screen - make_uint2(1))] * 0.025 +
-		//	helper_buffer[min(max(launch_index + make_uint2(-1, 0), make_uint2(0)), screen - make_uint2(1))] * 0.025 +
-		//	helper_buffer[launch_index] * 0.9;
-		//helper_buffer[launch_index] = vv;
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -130,7 +115,7 @@ RT_PROGRAM void path_tracer_camera()
 
 RT_PROGRAM void exception()
 {
-    output_buffer[launch_index] = make_float4(bad_color, 1.0f);
+    V_TARGET0[launch_index] = make_float4(bad_color, 1.0f);
 }
 
 //-----------------------------------------------------------------------------

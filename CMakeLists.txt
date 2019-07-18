@@ -187,72 +187,85 @@ endif()
 set(SAMPLES_CUDA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
 
 
-function(add_sample_executable target_name)
 
-  # These calls will group PTX and CUDA files into their own directories in the Visual
-  # Studio projects.
-  if (NOT CUDA_NVRTC_ENABLED)
-    source_group("PTX Files"  REGULAR_EXPRESSION ".+\\.ptx$")
-  endif()
-  source_group("CUDA Files" REGULAR_EXPRESSION ".+\\.cu$")
-
-  # Separate the sources from the CMake and CUDA options fed to the macro.  This code
-  # comes from the CUDA_COMPILE_PTX macro found in FindCUDA.cmake.  We are copying the
-  # code here, so that we can use our own name for the target.  target_name is used in the
-  # creation of the output file names, and we want this to be unique for each target in
-  # the SDK.
-  CUDA_GET_SOURCES_AND_OPTIONS(source_files cmake_options options ${ARGN})
-
-  if (CUDA_NVRTC_ENABLED)
-  
-    # Isolate OBJ target files. NVCC should only process these files and leave PTX targets for NVRTC
-    set(cu_obj_source_files)
-    foreach(file ${source_files})
-      get_source_file_property(_cuda_source_format ${file} CUDA_SOURCE_PROPERTY_FORMAT)
-      if(${_cuda_source_format} MATCHES "OBJ")
-        list(APPEND cu_obj_source_files ${file})
-      endif()
+function(assign_source_group_)
+    foreach(_source IN ITEMS ${ARGN})
+        if (IS_ABSOLUTE "${_source}")
+            file(RELATIVE_PATH _source_rel "${CMAKE_CURRENT_SOURCE_DIR}" "${_source}")
+        else()
+            set(_source_rel "${_source}")
+        endif()
+        get_filename_component(_source_path "${_source_rel}" PATH)
+        string(REPLACE "/" "\\" _source_path_msvc "${_source_path}")
+        source_group("${_source_path_msvc}" FILES "${_source}")
     endforeach()
+endfunction(assign_source_group)
+ 
+function(assign_source_group)
+    foreach(_source IN ITEMS ${ARGN})
+        assign_source_group_(${_source})
+    endforeach()
+endfunction(assign_source_group)
 
-    # Create the rules to build the OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} OBJ generated_files ${cu_obj_source_files} ${cmake_options} OPTIONS ${options} )
-  else()
-  
-    # Create the rules to build the PTX and OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} PTX generated_files ${source_files} ${cmake_options} OPTIONS ${options} )
-  endif()
-  
 
-  # Here is where we create the rule to make the executable.  We define a target name and
-  # list all the source files used to create the target.  In addition we also pass along
-  # the cmake_options parsed out of the arguments.
-  add_executable(${target_name}
-    ${source_files}
-    ${generated_files}
-    ${cmake_options}
+
+function(add_sample_executable target_name)
+	if (NOT CUDA_NVRTC_ENABLED)
+    	source_group("PTX Files"  REGULAR_EXPRESSION ".+\\.ptx$")
+ 	endif()
+  	
+  	source_group("CUDA Files" REGULAR_EXPRESSION ".+\\.cu$")
+	
+	CUDA_GET_SOURCES_AND_OPTIONS(source_files cmake_options options ${ARGN})
+
+ 	if (CUDA_NVRTC_ENABLED)  
+    	# Isolate OBJ target files. NVCC should only process these files and leave PTX targets for NVRTC
+    	set(cu_obj_source_files)
+    	foreach(file ${source_files})
+      		get_source_file_property(_cuda_source_format ${file} CUDA_SOURCE_PROPERTY_FORMAT)
+      		if(${_cuda_source_format} MATCHES "OBJ")
+        		list(APPEND cu_obj_source_files ${file})
+      		endif()
+    	endforeach()
+
+    	# Create the rules to build the OBJ from the CUDA files.
+    	CUDA_WRAP_SRCS( ${target_name} OBJ generated_files ${cu_obj_source_files} ${cmake_options} OPTIONS ${options} )
+  	else()
+  
+    	# Create the rules to build the PTX and OBJ from the CUDA files.
+   		CUDA_WRAP_SRCS( ${target_name} PTX generated_files ${source_files} ${cmake_options} OPTIONS ${options} )
+  	endif()
+  
+  	assign_source_group(${ARGN})
+
+  	# Here is where we create the rule to make the executable.  We define a target name and
+  	# list all the source files used to create the target.  In addition we also pass along
+  	# the cmake_options parsed out of the arguments.
+  	add_executable(${target_name}
+    	${source_files}
+    	${generated_files}
+    	${cmake_options}
     )
 
-  # Most of the samples link against the sutil library and the optix library.  Here is the
-  # rule that specifies this linkage.
-  target_link_libraries( ${target_name}
-    sutil_sdk
-    optix
-    ${optix_rpath}
-    #Qt5::Widgets
-    #Qt5::OpenGL
-	  Imgui
+  	# Most of the samples link against the sutil library and the optix library.  Here is the
+  	# rule that specifies this linkage.
+  	target_link_libraries( ${target_name}
+    	sutil_sdk
+    	optix
+    	${optix_rpath}
+	  	Imgui
     )
 	
-  add_dependencies(${target_name} Imgui)
+  	add_dependencies(${target_name} Imgui)
 
-  if( UNIX AND NOT APPLE )
-    # Force using RPATH instead of RUNPATH on Debian
-    target_link_libraries( ${target_name} "-Wl,--disable-new-dtags" )
-  endif()
+  	if( UNIX AND NOT APPLE )
+   		# Force using RPATH instead of RUNPATH on Debian
+    	target_link_libraries( ${target_name} "-Wl,--disable-new-dtags" )
+ 	endif()
 
-  if(USING_GNU_CXX)
-    target_link_libraries( ${target_name} m ) # Explicitly link against math library (C samples don't do that by default)
-  endif()
+  	if(USING_GNU_CXX)
+    	target_link_libraries( ${target_name} m ) # Explicitly link against math library (C samples don't do that by default)
+  	endif()
 endfunction()
 
 #########################################################

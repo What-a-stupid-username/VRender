@@ -7,7 +7,7 @@
 
 //-----------------------------------------------------------------------------
 //
-//  default_lit_ closest-hit
+//  default_lit closest-hit
 //
 //-----------------------------------------------------------------------------
 
@@ -61,6 +61,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 	b = (current_prd.depth + 1) * current_prd.importance;
 	float cut_off = 1 / b;
 
+	/*
 	if (current_prd.depth < max_depth)
 	{
 		if (z2 < cut_off)
@@ -94,7 +95,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				if (refract(p, ray.direction, n, in_to_out ? 1.0f / refraction_index : refraction_index)) {
 					prd.countEmitted = false;
 
-					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+					next_ray = make_Ray(hitpoint, p, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 					rtTrace(top_object, next_ray, prd);
 
@@ -107,7 +108,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 				prd.countEmitted = false;
 
-				next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+				next_ray = make_Ray(hitpoint, p, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 				rtTrace(top_object, next_ray, prd);
 				current_prd.radiance = prd.radiance * baseColor / max_diffuse;
@@ -123,7 +124,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				if (dot(p, ffnormal) > 0) {
 					prd.countEmitted = false;
 
-					next_ray = make_Ray(hitpoint, p, common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+					next_ray = make_Ray(hitpoint, p, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 					rtTrace(top_object, next_ray, prd);
 
@@ -133,9 +134,8 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 			current_prd.radiance *= sum_w * b;
 		}
 	}
-
-	//if (z2 > cut_off) return;
-
+	*/
+	
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
 

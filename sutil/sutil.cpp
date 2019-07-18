@@ -1147,25 +1147,16 @@ const char* sutil::getPtxString(
 
     std::string *ptx, cu;
     std::string key = std::string( filename ) + ";" + ( sample ? sample : "" );
-    std::map<std::string, std::string *>::iterator elem = g_ptxSourceCache.map.find( key );
 
-    if( elem == g_ptxSourceCache.map.end() )
-    {
-        ptx = new std::string();
+	ptx = new std::string();
 #if CUDA_NVRTC_ENABLED
-        std::string location;
-        getCuStringFromFile( cu, location, sample, filename );
-        getPtxFromCuString( *ptx, sample, cu.c_str(), location.c_str(), log );
+	std::string location;
+	getCuStringFromFile(cu, location, sample, filename);
+	getPtxFromCuString(*ptx, sample, cu.c_str(), location.c_str(), log);
 #else
-        getPtxStringFromFile( *ptx, sample, filename );
+	getPtxStringFromFile(*ptx, sample, filename);
 #endif
-        g_ptxSourceCache.map[key] = ptx;
-    }
-    else
-    {
-        ptx = elem->second;
-    }
-
+	g_ptxSourceCache.map[key] = ptx;
     return ptx->c_str();
 }
 

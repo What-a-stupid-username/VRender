@@ -1,0 +1,36 @@
+# CMake generation dependency list for this directory.
+C:/Users/hjk/Desktop/VRender/CMake/CompilerInfo.cmake
+C:/Users/hjk/Desktop/VRender/CMake/ConfigCompilerFlags.cmake
+C:/Users/hjk/Desktop/VRender/CMake/FindCUDA.cmake
+C:/Users/hjk/Desktop/VRender/CMake/FindCUDA/select_compute_arch.cmake
+C:/Users/hjk/Desktop/VRender/CMake/FindMDLWrapper.cmake
+C:/Users/hjk/Desktop/VRender/CMake/FindOptiX.cmake
+C:/Users/hjk/Desktop/VRender/CMake/FindSUtilGLUT.cmake
+C:/Users/hjk/Desktop/VRender/CMake/Macros.cmake
+C:/Users/hjk/Desktop/VRender/CMake/sse_support.h.in
+C:/Users/hjk/Desktop/VRender/CMakeLists.txt
+C:/Users/hjk/Desktop/VRender/build/CMakeFiles/3.14.3/CMakeCCompiler.cmake
+C:/Users/hjk/Desktop/VRender/build/CMakeFiles/3.14.3/CMakeCXXCompiler.cmake
+C:/Users/hjk/Desktop/VRender/build/CMakeFiles/3.14.3/CMakeRCCompiler.cmake
+C:/Users/hjk/Desktop/VRender/build/CMakeFiles/3.14.3/CMakeSystem.cmake
+C:/Users/hjk/Desktop/VRender/sampleConfig.h.in
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeCInformation.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeCXXInformation.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeCommonLanguageInclude.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeGenericSystem.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeInitializeConfigs.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeLanguageInformation.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeRCInformation.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeSystemSpecificInformation.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/CMakeSystemSpecificInitialize.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Compiler/CMakeCommonCompilerMacros.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Compiler/MSVC-C.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Compiler/MSVC-CXX.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/FindOpenGL.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/FindPackageHandleStandardArgs.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/FindPackageMessage.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Platform/Windows-MSVC-C.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Platform/Windows-MSVC-CXX.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Platform/Windows-MSVC.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Platform/Windows.cmake
+F:/Program Files (x86)/CMake/share/cmake-3.14/Modules/Platform/WindowsPaths.cmake
