@@ -20,6 +20,10 @@ Git bash in Root dir, then:
 
 `./FindOptiX.sh 'YOUR_OPTIX_INSTALL_ROOT_DIR'                 `
 
-Open CMake, click Configure, change the generator of CMake to VS2017 Win64. After everything is done, click Generate.
+Open CMake, click Configure, change the generator of CMake to VS2017/2019 Win64. After everything is done, click Generate.
 
 Open VRenderer.sln and build the project.
+
+## Log
+
+2019.7.19  new “pipeline” feature, refactor underlying
