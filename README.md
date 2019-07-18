@@ -28,6 +28,6 @@ Open VRenderer.sln and build the project.
 
 * 2019.7.19
 
-	new “pipeline” feature
+	1. new “pipeline” feature
 
-	refactor underlying
+	2. refactor underlying
