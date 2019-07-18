@@ -27,5 +27,7 @@ Open VRenderer.sln and build the project.
 ## Log
 
 * 2019.7.19  
+
 ** new “pipeline” feature
+
 ** refactor underlying
