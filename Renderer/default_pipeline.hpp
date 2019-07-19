@@ -24,18 +24,21 @@ namespace VRender {
 		};
 
 		void Render(VCamera& camera, const VRenderContext& renderContext) {
-
+			//change helper_buffer to target_buffer's size
 			ChangeBufferSize(helper_Buffer, renderContext.target);
 
+			//bind scene data
 			PipelineUtility::SetGlobalProperties("top_object", renderContext.root);
 			PipelineUtility::SetGlobalProperties("lights", renderContext.lights);
 
+			//set render target
 			vector<optix::Buffer> rts;
 			rts.push_back(renderContext.target);
 			rts.push_back(helper_Buffer);
 
 			PipelineUtility::SetRenderTarget(rts);
 
+			//setup camera data
 			PipelineUtility::SetupCameraProperties(camera);
 
 			PipelineUtility::Dispatch<true>(ray_trace_index);
@@ -43,8 +46,9 @@ namespace VRender {
 
 			PipelineUtility::SetRenderTarget(renderContext.target);
 
+			//set texture
 			PipelineUtility::SetGlobalTexture("mainTex", test);
-
+			//post
 			PipelineUtility::Dispatch<false>(blit_index);
 		}
 
