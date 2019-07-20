@@ -352,6 +352,19 @@ const char* sutil::samplesDir()
     return ".";
 }
 
+std::string project_dir = SAMPLES_DIR;
+const char* sutil::projectDir()
+{
+	if (!dirExists(project_dir.c_str()))
+		project_dir = SAMPLES_DIR;
+
+	return project_dir.c_str();
+}
+
+void sutil::setProjectDir(const char* dir) {
+	if (dirExists(dir))
+		project_dir = dir;
+}
 
 const char* sutil::samplesPTXDir()
 {

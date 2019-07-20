@@ -33,11 +33,11 @@ rtDeclareVariable(unsigned int, pathtrace_shadow_ray_type, , ) = 1;
 
 
 rtDeclareVariable(unsigned int, rnd_seed, , );
-rtDeclareVariable(float, diffuse_strength, , );
-rtDeclareVariable(int, max_depth, , );
+rtDeclareVariable(float, diffuse_strength, , ) = 1;
+rtDeclareVariable(int, max_depth, , ) = 3;
 
 
-rtBuffer<ParallelogramLight>     lights;
+rtBuffer<Light>     lights;
 
 rtDeclareVariable(float3, bg_color, , );
 rtDeclareVariable(float3, bad_color, , );

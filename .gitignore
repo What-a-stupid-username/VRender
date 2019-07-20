@@ -5,6 +5,8 @@
 
 Cmake/
 
+Renderer.old/
+
 # User-specific files
 *.suo
 *.user

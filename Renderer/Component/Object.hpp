@@ -121,6 +121,7 @@ namespace VRender {
 			optix::Transform GetPrimeObj() { return transform->GetPrimeObj(); }
 		public:
 			string name;
+			int light_id = -1;
 
 			VRender::VTransform Transform() { return transform; }
 			VRender::VMeshFilter MeshFilter() { return meshFilter; }
@@ -162,11 +163,13 @@ namespace VRender {
 				need_rebind_objects.insert(all_objects[obj]);
 			}
 
-			static void RebindObjectComponents() {
+			static bool RebindObjectComponents() {
+				if (need_rebind_objects.empty()) return false;
 				for each (auto obj in need_rebind_objects) {
 					obj->ApplyRebind();
 				}
 				need_rebind_objects.clear();
+				return true;
 			}
 
 			static void RegenerateGraph() {

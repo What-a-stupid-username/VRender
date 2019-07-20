@@ -12,7 +12,7 @@ namespace VRender {
 			transform = OptixInstance::Instance().Context()->createTransform();
 			transform->setMatrix(false, identity, identity);
 
-			pos = rotate = make_float3(0);
+			pos = rotation = make_float3(0);
 			scale = make_float3(1);
 		}
 		

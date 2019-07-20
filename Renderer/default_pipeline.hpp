@@ -47,9 +47,9 @@ namespace VRender {
 			PipelineUtility::SetRenderTarget(renderContext.target);
 
 			//set texture
-			PipelineUtility::SetGlobalTexture("mainTex", test);
+			//PipelineUtility::SetGlobalTexture("mainTex", test);
 			//post
-			PipelineUtility::Dispatch<false>(blit_index);
+			//PipelineUtility::Dispatch<false>(blit_index);
 		}
 
 		void ChangeBufferSize(optix::Buffer buffer, optix::Buffer to_buffer) {

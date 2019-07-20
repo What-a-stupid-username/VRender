@@ -3,11 +3,12 @@
 #include <optixu/optixu_math_namespace.h>
 
 
-struct ParallelogramLight                                                        
-{                                                                                
-    optix::float3 corner;                                                          
-    optix::float3 v1, v2;                                                          
-    optix::float3 normal;                                                          
+struct Light
+{                  
+	int type;
+    optix::float3 a;                                                          
+    optix::float3 b, c;                                                          
+    optix::float3 d;                                                          
     optix::float3 emission;                                                        
 };                                                                               
 

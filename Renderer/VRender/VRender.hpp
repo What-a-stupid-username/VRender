@@ -22,7 +22,7 @@ namespace VRender {
 
 		VCamera camera;
 
-		int delta = 10;
+		int delta = 5;
 
 		VRenderContext render_context;
 
@@ -31,12 +31,13 @@ namespace VRender {
 	protected:
 
 		void PrepareRenderContext() {
-			prime::PrimeObjectManager::RebindObjectComponents();
+			bool changed = prime::PrimeLightManager::RegenerateLightBuffer();
 
-			prime::PrimeComponentManager::ApplyChanges();
+			changed |= prime::PrimeComponentManager::ApplyChanges();
 
-			prime::PrimeLightManager::RegenerateLightBuffer();
-
+			changed |= prime::PrimeObjectManager::RebindObjectComponents();
+			if (changed) prime::PrimeObjectManager::Root()->getAcceleration()->markDirty();
+			
 			render_context.target = result;
 			render_context.root = prime::PrimeObjectManager::Root();
 			render_context.lights = prime::PrimeLightManager::LightBuffer();

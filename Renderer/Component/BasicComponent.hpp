@@ -95,12 +95,15 @@ namespace VRender {
 				dirt_comps.insert(comp);
 			}
 
-			static void ApplyChanges() {
+			static bool ApplyChanges() {
+				if (dirt_comps.empty()) return false;
+
 				for each (auto comp in dirt_comps)
 				{
 					comp->ApplyPropertiesChanged();
 				}
 				dirt_comps.clear();
+				return true;
 			}
 		};
 	}

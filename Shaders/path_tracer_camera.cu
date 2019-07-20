@@ -12,7 +12,7 @@ rtDeclareVariable(float3,			camera_forward, , );
 rtDeclareVariable(float3,			camera_right, , );
 rtDeclareVariable(float2,			camera_fov, , );
 rtDeclareVariable(unsigned int,		camera_staticFrameNum, , );
-rtDeclareVariable(unsigned int,		sqrt_num_samples, , ) = 2;
+rtDeclareVariable(unsigned int,		sqrt_num_samples, , ) = 1;
 rtDeclareVariable(unsigned int,		cut_off_high_variance_result, , ) = 0;
 
 
@@ -31,7 +31,6 @@ inline float distance2(const float3& a, const float3& b) {
 RT_PROGRAM void dispatch()
 {
 	float3 last_color_result = make_float3(V_TARGET0[launch_index]);
-	float last_varient = camera_staticFrameNum > 100 ? V_TARGET1[launch_index].x : 1;
 
     uint2 screen = make_uint2(V_TARGET0.size().x, V_TARGET0.size().y);
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
@@ -47,7 +46,6 @@ RT_PROGRAM void dispatch()
 	unsigned int samples_index = samples_per_pixel;
 
 	float3 color_result = make_float3(0.0f);
-	float varient_result = 0;
     do 
     {
         //
@@ -58,17 +56,15 @@ RT_PROGRAM void dispatch()
         float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
         float2 d = pixel + jitter*jitter_scale;
 		
-		float3 ray_origin = camera_position/* + eye_jit*/;
+		float3 ray_origin = camera_position;
         float3 ray_direction = normalize(d.x * camera_right * camera_fov.y + d.y * camera_up * camera_fov.x + camera_forward);
 
-		//V_TARGET0[launch_index] = make_float4(d.x, d.y, 0, 1.0f); return;
         // Initialze per-ray data
         PerRayData_pathtrace prd;
         prd.countEmitted = true;
         prd.seed = seed;
 		prd.depth = 0;
 		prd.radiance = make_float3(0);
-		prd.importance = last_varient;
 
         Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
@@ -83,27 +79,22 @@ RT_PROGRAM void dispatch()
 			sample_result = prd.radiance;
 		}
 		color_result += sample_result;
-		varient_result += distance2(sample_result, last_color_result);
 
     } while (--samples_index);
+
     //
     // Update the output buffer
     //
-	varient_result /= samples_per_pixel * max(dot(last_color_result, last_color_result),0.01);
-	varient_result = min(max(varient_result, 0.4f), 1.f);
     color_result /= samples_per_pixel;
 
-	//V_TARGET0[launch_index] = make_float4(0,0,0,1);
     if (camera_staticFrameNum > 1)
     {
 		float a = 1.0f / (float)camera_staticFrameNum;
         V_TARGET0[launch_index] = make_float4( lerp(last_color_result, color_result, a), 1.0f );
-		V_TARGET1[launch_index] = make_float4(lerp(last_varient, varient_result, a));
     }
     else
     {
         V_TARGET0[launch_index] = make_float4(color_result, 1.0f);
-		V_TARGET1[launch_index] = make_float4(varient_result);
     }
 }
 

@@ -13,7 +13,7 @@ namespace VRender {
 
 			optix::Transform transform;
 
-			float3 pos, rotate, scale;
+			float3 pos, rotation, scale;
 
 			VTransform();
 
@@ -30,7 +30,7 @@ namespace VRender {
 			}
 			template<typename T>
 			T* Rotation() {
-				return (T*)& rotate;
+				return (T*)& rotation;
 			}
 			template<typename T>
 			T* Scale() {
@@ -41,9 +41,9 @@ namespace VRender {
 				Matrix4x4 mat;
 				mat = Matrix4x4::scale(scale);
 
-				mat = Matrix4x4::rotate(rotate.x / 180 * M_PI, make_float3(1, 0, 0)) * mat;
-				mat = Matrix4x4::rotate(rotate.y / 180 * M_PI, make_float3(0, 1, 0)) * mat;
-				mat = Matrix4x4::rotate(rotate.z / 180 * M_PI, make_float3(0, 0, 1)) * mat;
+				mat = Matrix4x4::rotate(rotation.x / 180 * M_PI, make_float3(1, 0, 0)) * mat;
+				mat = Matrix4x4::rotate(rotation.y / 180 * M_PI, make_float3(0, 1, 0)) * mat;
+				mat = Matrix4x4::rotate(rotation.z / 180 * M_PI, make_float3(0, 0, 1)) * mat;
 
 				mat = Matrix4x4::translate(pos) * mat;
 

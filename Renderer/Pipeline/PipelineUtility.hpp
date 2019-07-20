@@ -14,8 +14,9 @@ namespace VRender {
 			float3      right;
 			float2		fov;
 
+			bool dirty;
+
 			uint staticFrameNum = 1;
-			bool dirty = true;
 
 			VCameraObj() {
 				position = make_float3(0, 0, -2);
@@ -23,6 +24,7 @@ namespace VRender {
 				forward = make_float3(0, 0, 1);
 				right = make_float3(1, 0, 0);
 				fov = make_float2(45, 45);
+				dirty = true;
 			};
 		};
 	}
@@ -103,6 +105,10 @@ namespace VRender {
 		
 		static void SetupCameraProperties(VCamera& cam) {
 			camera = cam;
+			if (cam->dirty) {
+				cam->staticFrameNum = 0;
+				cam->dirty = false;
+			}
 			context["camera_position"]->setFloat(camera->position);
 			context["camera_up"]->setFloat(camera->up);
 			context["camera_forward"]->setFloat(camera->forward);

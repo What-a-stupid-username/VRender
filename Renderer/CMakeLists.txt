@@ -3,9 +3,6 @@ add_definitions(-DGLUT_FOUND -DGLUT_NO_LIB_PRAGMA)
 
 add_sample_executable(Renderer 
 
-	VRender.hpp
-	VRender.cpp
-
 	default_pipeline.hpp
 
     main.cpp
@@ -47,6 +44,12 @@ add_sample_executable(Renderer
 	
 	Pipeline/PipelineUtility.hpp
 	Pipeline/PipelineUtility.cpp
+	
+	VRender/VRender.hpp
+	VRender/VRender.cpp
+
+	VRender/Scene.hpp
+	VRender/Scene.cpp
 	
 	GUI/resource.rc
 	GUI/renderView.hpp

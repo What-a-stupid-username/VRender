@@ -87,6 +87,10 @@ void SUTILAPI handleError(
 // The pointer returned may point to a static array.
 SUTILAPI const char* samplesDir();
 
+SUTILAPI const char* projectDir();
+
+SUTILAPI void setProjectDir(const char* dir);
+
 // Query directory containing PTX files for compiled sample CUDA files.
 // The pointer returned may point to a static array.
 SUTILAPI const char* samplesPTXDir();

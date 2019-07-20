@@ -59,7 +59,7 @@ namespace VRender {
 			{
 				buffer = context->createBuffer(RT_BUFFER_INPUT);
 				int w, h, n;
-				auto img = stbi_load((string(sutil::samplesDir()) + "/Textures/" + path).c_str(), &w, &h, &n, STBI_rgb_alpha);
+				auto img = stbi_load((string(sutil::projectDir()) + "/Textures/" + path).c_str(), &w, &h, &n, STBI_rgb_alpha);
 
 				n = 4;
 				buffer->setFormat(RT_FORMAT_UNSIGNED_BYTE4);
@@ -100,33 +100,44 @@ namespace VRender {
 		}
 
 		void VMaterialObj::Load(const string& name) {
-			textures.clear();
-			for each (auto pair in properties)
-				pair.second.Release();
-			properties.clear();
-			shader = nullptr;
-
-			this->name = name;
-			PropertyReader reader("/Materials", name + ".txt");
-			properties = reader.GetAllProperties();
-
-			string shader_name = reader.GetPropertyValue<string>("Shader");
-			shader = VShaderManager::Find(shader_name);
-
-			for each (auto pair in properties)
+			try
 			{
-				if (pair.second.Type() == "string") {
-					int k1 = pair.first.find('|');
-					if (k1 != -1) {
-						string special_type = pair.first.substr(0, k1);
-						string name = pair.first.substr(k1 + 1, pair.first.length() - k1 - 1);
-						if (special_type == "Texture") {
-							auto tex_name = *pair.second.GetData<string>();
-							auto tex = VTextureManager::Find(tex_name);
-							textures[tex_name] = tex;
+				textures.clear();
+				for each (auto pair in properties)
+					pair.second.Release();
+				properties.clear();
+				shader = nullptr;
+
+				this->name = name;
+
+				if (name == "error") throw exception();
+
+				PropertyReader reader("/Materials", name + ".txt");
+				properties = reader.GetAllProperties();
+
+				string shader_name = reader.GetPropertyValue<string>("Shader");
+				shader = VShaderManager::Find(shader_name);
+
+				for each (auto pair in properties)
+				{
+					if (pair.second.Type() == "string") {
+						int k1 = pair.first.find('|');
+						if (k1 != -1) {
+							string special_type = pair.first.substr(0, k1);
+							string name = pair.first.substr(k1 + 1, pair.first.length() - k1 - 1);
+							if (special_type == "Texture") {
+								auto tex_name = *pair.second.GetData<string>();
+								auto tex = VTextureManager::Find(tex_name);
+								textures[tex_name] = tex;
+							}
 						}
 					}
 				}
+			}
+			catch (const std::exception&)
+			{
+				string shader_name = "error";
+				shader = VShaderManager::Find(shader_name);
 			}
 		}
 
@@ -149,8 +160,13 @@ namespace VRender {
 				tinyobj::attrib_t attrib;
 				std::vector<tinyobj::shape_t> shapes;
 				string warn, err;
-				tinyobj::LoadObj(&attrib, &shapes, NULL, &warn, &err, (string(sutil::samplesDir()) + "/Meshs/" + name).c_str());
-				if (err.length() != 0) throw Exception("ERROR read mesh.\n" + err);
+				tinyobj::LoadObj(&attrib, &shapes, NULL, &warn, &err, (string(sutil::projectDir()) + "/Meshs/" + name).c_str());
+				if (err.length() != 0) {
+					err = "";
+					tinyobj::LoadObj(&attrib, &shapes, NULL, &warn, &err, (string(sutil::samplesDir()) + "/Meshs/" + name).c_str());
+				}
+				if (err.length() != 0)
+					throw Exception("ERROR read mesh.\n" + err);
 				if (warn.length() != 0) cout << warn << endl;
 
 				for (int i = 0; i < attrib.vertices.size() / 3; i++)

@@ -1,8 +1,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 
-#include <VRender.hpp>
+#include <VRender/VRender.hpp>
 #include "default_pipeline.hpp"
-
+#include "VRender/Scene.hpp"
 
 #include "GUI/renderView.hpp"
 #include "GUI/DXWrapper.hpp"
@@ -27,38 +27,8 @@ int main(int argc, char** argv) {
 	#endif // !_DEBUG
 	#pragma endregion
 
-
-
-	struct Helper
-	{
-		static void CreateCube(float3 position, float3 rotation, float3 scale, string material = "default") {
-			VMesh mesh = VResources::Find<VMesh>("Cube.obj");
-
-			VMeshFilter filter = VComponents::Create<VMeshFilter>();
-
-			filter->SetMesh(mesh);
-
-			VMaterial mat = VResources::Find<VMaterial>(material);
-
-			VMeshRenderer render = VComponents::Create<VMeshRenderer>();
-
-			render->SetMaterial(mat);
-
-			VObject obj = VObjectManager::CreateNewObject();
-
-			obj->SetComponent(filter);
-			obj->SetComponent(render);
-
-			*obj->Transform()->Position<float3>() = position;
-			*obj->Transform()->Rotation<float3>() = rotation;
-			*obj->Transform()->Scale<float3>() = scale;
-		}
-	};
-
-
-	Helper::CreateCube(make_float3(0, -1, 0), make_float3(0, 0, 0), make_float3(1, 1, 1), "default");
-
-	VLightManager::CreateLight();
+	
+	VScene::LoadScene("C:/Users/hjk/Desktop/VRender/Cornell");
 
 	VRenderer& renderer = VRenderer::Instance();
 	renderer.SetupPipeline<DefaultPipeline>();

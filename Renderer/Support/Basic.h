@@ -140,7 +140,7 @@ namespace VRender {
 
 	public:
 		PropertyWriter(string path, string name) {
-			fp = fopen((string(sutil::samplesDir()) + path + "/" + name).c_str(), "w");
+			fp = fopen((string(sutil::projectDir()) + path + "/" + name).c_str(), "w");
 		};
 		~PropertyWriter() {
 			if (fp && !table.empty()) {
@@ -197,7 +197,7 @@ namespace VRender {
 	public:
 		PropertyReader(string path, string name) {
 			fstream fin;
-			fin.open((string(sutil::samplesDir()) + path + "/" + name).c_str(), ios::in);
+			fin.open((string(sutil::projectDir()) + path + "/" + name).c_str(), ios::in);
 			string tmp;
 			while (getline(fin, tmp)) {
 				string type, prop, value;

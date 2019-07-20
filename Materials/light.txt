@@ -1,2 +1,0 @@
-string:Shader:default_light
-float3:emission_color:15,15,15

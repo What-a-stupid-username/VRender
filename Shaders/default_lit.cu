@@ -58,10 +58,10 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 	float3 a;
 	float b;
 	baseColor = DiffuseAndSpecularFromMetallic(IN.baseColor, IN.metallic, a, b);
-	b = (current_prd.depth + 1) * current_prd.importance;
+	b = current_prd.depth + 1;
 	float cut_off = 1 / b;
 
-	/*
+	
 	if (current_prd.depth < max_depth)
 	{
 		if (z2 < cut_off)
@@ -134,22 +134,22 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 			current_prd.radiance *= sum_w * b;
 		}
 	}
-	*/
+	
 	
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
 
-	for (int i = 0; i < num_lights; ++i)
+	for (int i = 0; i < num_lights; ++i) //当前把所有类型的光都当作片光源
 	{
 		// Choose random point on light
-		ParallelogramLight light = lights[i];
-		const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+		Light light = lights[i];
+		const float3 light_pos = light.a + light.b * z1 + light.c * z2;
 
 		// Calculate properties of light sample (for area based pdf)
 		const float  Ldist = length(light_pos - hitpoint);
 		const float3 L = normalize(light_pos - hitpoint);
 		const float  nDl = dot(ffnormal, L);
-		const float  LnDl = -dot(light.normal, L);
+		const float  LnDl = -dot(light.d, L);
 
 		// cast shadow ray
 		if (nDl > 0.0f && LnDl > 0.0f)
@@ -162,7 +162,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 			if (shadow_prd.inShadow != 0)
 			{
-				const float A = length(cross(light.v1, light.v2));
+				const float A = length(cross(light.b, light.c));
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
 				float3 light_satu = light.emission * weight * shadow_prd.inShadow;

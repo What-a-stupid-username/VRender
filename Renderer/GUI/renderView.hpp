@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VRender.hpp"
+#include "VRender/VRender.hpp"
 #include "resource.h"
 
 // Mouse state
@@ -17,31 +17,98 @@ void glutMousePress(int button, int state, int x, int y)
 		mouse_button = button;
 		mouse_prev_pos = make_int2(x, y);
 	}
+	else if (state == GLUT_UP)
+	{
+		mouse_button = -1;
+	}
 }
 
 
+float w_width, w_height;
+
 void glutMouseMotion(int x, int y)
 {
-	float width, height;
-	if (mouse_button == GLUT_RIGHT_BUTTON)
-	{
-		const float dx = static_cast<float>(x - mouse_prev_pos.x) /
-			static_cast<float>(width);
-		const float dy = static_cast<float>(y - mouse_prev_pos.y) /
-			static_cast<float>(height);
-		const float dmax = fabsf(dx) > fabs(dy) ? dx : dy;
-		const float scale = std::min<float>(dmax, 0.9f);
-	}
-	else if (mouse_button == GLUT_LEFT_BUTTON)
-	{
-		const float2 from = { static_cast<float>(mouse_prev_pos.x),
-			static_cast<float>(mouse_prev_pos.y) };
-		const float2 to = { static_cast<float>(x),
-			static_cast<float>(y) };
+	int mod = glutGetModifiers();
 
-		const float2 a = { from.x / width, from.y / height };
-		const float2 b = { to.x / width, to.y / height };
+	const float2 from = { static_cast<float>(mouse_prev_pos.x),
+	static_cast<float>(mouse_prev_pos.y) };
+	const float2 to = { static_cast<float>(x),
+		static_cast<float>(y) };
+
+	const float2 a = { from.x / w_width, from.y / w_height };
+	const float2 b = { to.x / w_width, to.y / w_height };
+	float2 del = b - a;
+	auto cam = VRender::VRenderer::Instance().Camera();
+
+	if (mod == GLUT_ACTIVE_ALT) {
+		if (mouse_button == GLUT_LEFT_BUTTON) //绕视点中心旋转
+		{
+			float3 pos = cam->position;
+			float3 forward = cam->forward;
+			float3 up = cam->up;
+			float3 ori = pos + forward * 5;
+			float3 ri = cam->right;
+
+			pos += (del.y * up - del.x * ri) * 10;
+			forward = normalize(ori - pos);
+			pos = forward * -5 + ori;
+			ri = cross(forward, float3{ 0,1,0 });
+			up = cross(ri, forward);
+			VRender::VRenderer::Instance().Lock();
+			cam->position = pos;
+			cam->forward = forward;
+			cam->up = up;
+			cam->right = ri;
+			cam->dirty = true;
+			VRender::VRenderer::Instance().Unlock();
+		}
+		else if (mouse_button == GLUT_RIGHT_BUTTON) //缩放
+		{
+			VRender::VRenderer::Instance().Lock();
+			cam->position += cam->forward * del.y * 10;
+			cam->dirty = true;
+			VRender::VRenderer::Instance().Unlock();
+
+		}
+		else //平移
+		{
+			VRender::VRenderer::Instance().Lock();
+			cam->position += (cam->right * -del.x + cam->up * del.y) * 10;
+			cam->dirty = true;
+			VRender::VRenderer::Instance().Unlock();
+		}
 	}
+	else 
+	{
+		if (mouse_button == GLUT_RIGHT_BUTTON) //绕视点旋转
+		{
+			float3 forward = cam->forward;
+			float3 up = cam->up;
+			float3 ri = cam->right;
+
+			forward = normalize(forward + (cam->right * -del.x + cam->up * del.y) * 2);
+			ri = cross(forward, float3{ 0,1,0 });
+			up = cross(ri, forward);
+			VRender::VRenderer::Instance().Lock();
+			cam->forward = forward;
+			cam->up = up;
+			cam->right = ri;
+			cam->dirty = true;
+			VRender::VRenderer::Instance().Unlock();
+		}
+		else if (mouse_button == GLUT_LEFT_BUTTON) //选取
+		{
+
+		}
+		else//平移
+		{		
+			VRender::VRenderer::Instance().Lock();
+			cam->position += (cam->right * -del.x + cam->up * del.y) * 10;
+			cam->dirty = true;
+			VRender::VRenderer::Instance().Unlock();
+		}
+	}
+
 	mouse_prev_pos = make_int2(x, y);
 }
 
@@ -55,6 +122,7 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 void glutResize(int w, int h)
 {
 		glViewport(0, 0, w, h);
+		w_width = w, w_height = h;
 		glutPostRedisplay();
 }
 

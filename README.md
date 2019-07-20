@@ -26,8 +26,9 @@ Open VRenderer.sln and build the project.
 
 ## Log
 
+* 2019.7.20
+  1. add scene description file, with an example scene "Cornell Box"
+  2. add camera support
 * 2019.7.19
-
-	1. new “pipeline” feature
-
-	2. refactor underlying
+  1. new “pipeline” feature
+  2. refactor underlying
