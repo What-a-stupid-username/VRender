@@ -15,6 +15,7 @@
 #include <time.h>
 #include<io.h>
 
+template<bool file>
 class FileLoader {
 private:
 	void find(const char* lpPath, string type)
@@ -75,6 +76,8 @@ public:
 		if (!open) return false;
 		ImGui::Begin("Setlect file", &open, ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse);
 		ImGui::SetWindowFocus();
+		int l = min<int>(max<int>(7 * result.size() + 30, 200), 800);
+		ImGui::SetWindowSize(ImVec2(l, 250));
 
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		need_size = ImVec2(max(need_size.x, tmp.x), max(need_size.y, tmp.y));
@@ -97,7 +100,7 @@ public:
 		for each (auto name in files)
 		{
 			if (ImGui::Selectable((name + "###FileLoader" + to_string(index++)).c_str(), false, ImGuiSelectableFlags_::ImGuiSelectableFlags_AllowDoubleClick)) {
-				result += "/" + name;
+				if (file) result += "/" + name;
 				open = false;
 				ImGui::End();
 				return true;
@@ -114,15 +117,6 @@ public:
 		return false;
 	}
 };
-
-
-
-
-
-
-
-
-
 
 
 class VGUI {
@@ -201,78 +195,103 @@ private:
 		ImGui::End();
 	}
 
-	//void DrawConsole() {
-	//	ImGui::Begin("Console", &show_console_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
-	//	ImGui::SetWindowPos(next_Window_pos);
-	//	if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 240));
+	void DrawConsole() {
+		ImGui::Begin("Console", &show_console_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::SetWindowPos(next_Window_pos);
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 260));
 
-	//	next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
-	//	auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
-	//	needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-	//	float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
-	//	next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
+		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
+		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
 
-	//	if (layer.pause) {
-	//		if (ImGui::Button("Continue Renderer")) layer.pause = false;
-	//	}
-	//	else {
-	//		if (ImGui::Button("Pause Renderer")) layer.pause = true;
-	//	}
+		static bool pause = false;
+		if (pause) {
+			if (ImGui::Button("Continue Render")) {
+				renderer.EnableRenderer(true);
+				pause = !pause;
+			}
+		}
+		else {
+			if (ImGui::Button("Pause Render")) {
+				renderer.EnableRenderer(false);
+				pause = !pause;
+			}
+		}
 
-	//	if (ImGui::Button("Reload scene")) {
-	//		sutil::ClearPtxCache();
-	//		layer.LoadScene();
-	//	}
+		static FileLoader<false> loader;
+		static bool loader_open = false;
+		static bool loading = false;
+		if (ImGui::Button("Load scene")) { loader_open = true; }
+		if (loader.Draw(needed_size, "txt", loader_open)) {
+			sutil::ClearPtxCache();
+			thread([&]() {
+				string path = loader.result;
+				loading = true;
+				renderer.Lock();
+				if (!VRender::VScene::LoadScene(path)) {
+					VRender::VScene::LoadScene(string(sutil::samplesDir()) + "/Cornell");
+				}
+				loading = false;
+				renderer.Unlock();
+			}).detach();
+		}
+		if (loading) {
+			ImGui::Begin("Loading: ", 0, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse);
+			ImGui::SetWindowFocus();
+			float v = VRender::VScene::persent;
+			ImGui::ProgressBar(v, ImVec2(200,20));
+			ImGui::End();
+		}
 
-	//	ImGui::Separator();
+		//if (ImGui::CollapsingHeader("Result Type"))
+		//{
+		//	if (ImGui::MenuItem("original Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::origial))
+		//		layer.resultType = OptiXLayer::ResultBufferType::origial;
+		//	if (ImGui::MenuItem("tonmap Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::tonemap))
+		//		layer.resultType = OptiXLayer::ResultBufferType::tonemap;
+		//	if (ImGui::MenuItem("denoised Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::denoise))
+		//		layer.resultType = OptiXLayer::ResultBufferType::denoise;
+		//	if (ImGui::MenuItem("helper Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::helper))
+		//		layer.resultType = OptiXLayer::ResultBufferType::helper;
+		//}
 
-	//	if (ImGui::CollapsingHeader("Result Type"))
-	//	{
-	//		if (ImGui::MenuItem("original Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::origial))
-	//			layer.resultType = OptiXLayer::ResultBufferType::origial;
-	//		if (ImGui::MenuItem("tonmap Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::tonemap))
-	//			layer.resultType = OptiXLayer::ResultBufferType::tonemap;
-	//		if (ImGui::MenuItem("denoised Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::denoise))
-	//			layer.resultType = OptiXLayer::ResultBufferType::denoise;
-	//		if (ImGui::MenuItem("helper Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::helper))
-	//			layer.resultType = OptiXLayer::ResultBufferType::helper;
-	//	}
+		//ImGui::Separator();
 
-	//	ImGui::Separator();
+		//{
+		//	bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
+		//	if (k) layer.MarkDirty();
+		//}
 
-	//	{
-	//		bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
-	//		if (k) layer.MarkDirty();
-	//	}
+		//static bool post = false;
+		//if (layer.resultType != OptiXLayer::ResultBufferType::origial && layer.resultType != OptiXLayer::ResultBufferType::helper) {
+		//	if (post == false) layer.RebuildCommandList(true);
+		//	ImGui::SliderFloatLableOnLeft("Exposure", "###1", &layer.exposure, 0, 100, "%.4f", 3);
+		//	post = true;
+		//}
+		//else {
+		//	if (post == true) layer.RebuildCommandList(false);
+		//	post = false;
+		//}
 
-	//	static bool post = false;
-	//	if (layer.resultType != OptiXLayer::ResultBufferType::origial && layer.resultType != OptiXLayer::ResultBufferType::helper) {
-	//		if (post == false) layer.RebuildCommandList(true);
-	//		ImGui::SliderFloatLableOnLeft("Exposure", "###1", &layer.exposure, 0, 100, "%.4f", 3);
-	//		post = true;
-	//	}
-	//	else {
-	//		if (post == true) layer.RebuildCommandList(false);
-	//		post = false;
-	//	}
+		//ImGui::Separator();
 
-	//	ImGui::Separator();
+		//{
+		//	bool k = ImGui::SliderInt("###2", &layer.max_depth, 0, 10, "max tracing depth = %d");
+		//	if (k) layer.MarkDirty();
+		//}
 
-	//	{
-	//		bool k = ImGui::SliderInt("###2", &layer.max_depth, 0, 10, "max tracing depth = %d");
-	//		if (k) layer.MarkDirty();
-	//	}
+		//{
+		//	int sample_num_per_pixel = layer.sqrt_num_samples * layer.sqrt_num_samples;
+		//	ImGui::SliderInt("###3", &sample_num_per_pixel, 1, 16, "sample num per pixel = %d");
+		//	layer.sqrt_num_samples = sqrt(sample_num_per_pixel);
+		//}
 
-	//	{
-	//		int sample_num_per_pixel = layer.sqrt_num_samples * layer.sqrt_num_samples;
-	//		ImGui::SliderInt("###3", &sample_num_per_pixel, 1, 16, "sample num per pixel = %d");
-	//		layer.sqrt_num_samples = sqrt(sample_num_per_pixel);
-	//	}
+		//ImGui::Checkbox("Cut off high varient result", &layer.cut_off_high_variance_result);
 
-	//	ImGui::Checkbox("Cut off high varient result", &layer.cut_off_high_variance_result);
-
-	//	ImGui::End();
-	//}
+		ImGui::End();
+	}
 
 	//void DrawSettings() {
 	//	ImGui::Begin("Settings", &show_setting_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
@@ -529,11 +548,11 @@ public:
 
 	void OnDrawGUI() {
 
-		//Main Menu
+		// Main Menu
 		DrawMainMenu();
 
-		//// Console
-		//if (show_console_window) DrawConsole();
+		// Console
+		if (show_console_window) DrawConsole();
 
 		//// Settings
 		//if (show_setting_window) DrawSettings();

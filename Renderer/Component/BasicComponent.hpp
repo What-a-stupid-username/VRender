@@ -94,6 +94,7 @@ namespace VRender {
 			static void MarkDirty(T comp) {
 				dirt_comps.insert(comp);
 			}
+			static void Clear() { dirt_comps.clear(); }
 
 			static bool ApplyChanges() {
 				if (dirt_comps.empty()) return false;

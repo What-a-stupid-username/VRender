@@ -28,11 +28,11 @@ int main(int argc, char** argv) {
 	#pragma endregion
 
 	
-	VScene::LoadScene("C:/Users/hjk/Desktop/VRender/Cornell");
+	VScene::LoadScene(string(sutil::samplesDir()) + "/Cornell");
 
 	VRenderer& renderer = VRenderer::Instance();
 	renderer.SetupPipeline<DefaultPipeline>();
-
+	//renderer.EnableRenderer(false);
 
 
 	#pragma region Show up GUI views

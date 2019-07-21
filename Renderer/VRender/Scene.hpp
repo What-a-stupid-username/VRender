@@ -1,7 +1,7 @@
 #pragma once
 
 #include "VRender/VRender.hpp"
-
+#include <atomic>
 
 namespace VRender {
 
@@ -39,12 +39,15 @@ namespace VRender {
 
 
 	public:
+		static atomic<float> persent;
+
 		static string SceneName() { return name; }
 
 		static bool LoadScene(string path) {
 			
 			VObjectManager::RemoveAll();
 			VLightManager::RemoveAll();
+			prime::PrimeComponentManager::Clear();
 			
 			int line = 1;
 			fstream fin;
@@ -55,11 +58,18 @@ namespace VRender {
 				fin.open((string(sutil::projectDir()) + "/Scene.txt").c_str(), ios::in);
 				if (!fin) throw Exception("Scene file not exist.");
 
+				vector<string> lines;
 				string tmp;
 				while (getline(fin, tmp)) {
-					ProcessLine(tmp);
-					line++;
+					lines.push_back(tmp);
 				}
+				if (lines.empty()) throw Exception("Empty scene file!");
+				for each (string str in lines) {
+					ProcessLine(str);
+					line++;
+					persent = (float)line / lines.size();
+				}
+
 				fin.close();
 				return true;
 			}

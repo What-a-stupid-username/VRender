@@ -134,6 +134,7 @@ namespace VRender {
 
 			static void RemoveAll() {
 				lights.clear();
+				light_objects.clear();
 				dirty_lights.clear();
 			}
 		};

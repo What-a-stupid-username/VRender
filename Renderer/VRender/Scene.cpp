@@ -2,6 +2,7 @@
 
 namespace VRender {
 	string VScene::name;
+	atomic<float> VScene::persent = 0;
 	vector<string> VScene::split(const string& str, const string& delim) {
 		vector<string> res;
 		if ("" == str) return res;
