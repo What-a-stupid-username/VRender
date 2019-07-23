@@ -4,8 +4,13 @@
 #include "resource.h"
 
 // Mouse state
-int2           mouse_prev_pos;
-int            mouse_button;
+int2	mouse_prev_pos;
+int2	mouse_press_pos;
+int		mouse_button;
+
+int* id_buffer = NULL;
+
+float w_width, w_height;
 
 //helper
 sutil::Arcball arcball;
@@ -16,15 +21,27 @@ void glutMousePress(int button, int state, int x, int y)
 	{
 		mouse_button = button;
 		mouse_prev_pos = make_int2(x, y);
+		mouse_press_pos = make_int2(x, y);
 	}
 	else if (state == GLUT_UP)
 	{
 		mouse_button = -1;
+		if (button == GLUT_LEFT_BUTTON) {
+			if (abs(x - mouse_press_pos.x) + abs(y - mouse_press_pos.y) > 10) return;
+			VRender::VRenderer & renderer = VRender::VRenderer::Instance();
+			optix::Buffer id_mask = renderer.GetIDMask();
+			renderer.Lock();
+			RTsize w, h; id_mask->getSize(w, h);
+			int* id_buffer_ = (int*)id_mask->map();
+			memcpy(id_buffer, id_buffer_, sizeof(int) * w * h);
+			id_mask->unmap();
+			renderer.Unlock();
+			renderer.SetSelectedObject(id_buffer[(h - y) * w + x]);
+		}
 	}
 }
 
 
-float w_width, w_height;
 
 void glutMouseMotion(int x, int y)
 {
@@ -138,7 +155,7 @@ void glutDisplay()
 		first_run = false;
 	}
 	
-	sutil::displayBufferGL(VRender::VRenderer::Instance().GetRenderResult());
+	sutil::displayBufferGL(VRender::VRenderer::Instance().GetRenderTarget());
 
 	glutSwapBuffers();
 
@@ -166,10 +183,11 @@ void glutInitialize(int* argc, char** argv)
 		::SendMessage(GL_Window, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
 	}
 	glutHideWindow();
+	id_buffer = (int*)malloc(sizeof(int) * 4096 * 4096);
 }
 
 void glutExitProgram() {
-
+	free(id_buffer);
 }
 
 void glutRun()

@@ -15,7 +15,7 @@ namespace VRender {
 	public:
 
 		DefaultPipeline() : VPipeline() {
-			ray_trace_index = PipelineUtility::AddDispatch("path_tracer_camera");
+			ray_trace_index = PipelineUtility::AddDispatch<true>("path_tracer_camera");
 			blit_index = PipelineUtility::AddDispatch("blit");
 			
 			helper_Buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, 512, 512, false);

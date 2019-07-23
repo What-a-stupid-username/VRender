@@ -18,7 +18,7 @@ rtDeclareVariable(unsigned int,		cut_off_high_variance_result, , ) = 0;
 
 rtBuffer<float4, 2>              V_TARGET0;
 rtBuffer<float4, 2>              V_TARGET1;
-
+rtBuffer<int, 2>				 ID_MASK;
 
 inline float distance2(const float3& a, const float3& b) {
 	float3 d = a - b;
@@ -46,6 +46,7 @@ RT_PROGRAM void dispatch()
 	unsigned int samples_index = samples_per_pixel;
 
 	float3 color_result = make_float3(0.0f);
+	int id = -1;
     do 
     {
         //
@@ -64,12 +65,13 @@ RT_PROGRAM void dispatch()
         prd.countEmitted = true;
         prd.seed = seed;
 		prd.depth = 0;
+		prd.id = -1;
 		prd.radiance = make_float3(0);
 
         Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
-
+		id = prd.id;
 		float3 sample_result;
 		if (cut_off_high_variance_result) {
 			float sat = 50;
@@ -96,6 +98,7 @@ RT_PROGRAM void dispatch()
     {
         V_TARGET0[launch_index] = make_float4(color_result, 1.0f);
     }
+	ID_MASK[launch_index] = id;
 }
 
 //-----------------------------------------------------------------------------

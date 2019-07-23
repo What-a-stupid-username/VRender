@@ -4,11 +4,15 @@ namespace VRender {
 
 	namespace prime {
 
+		static int objectID = 0;
 		void* Create() {
-			return new VObjectObj();
+			auto ptr = new VObjectObj(objectID);
+			objectID++;
+			return ptr;
 		}
 
-		unordered_map<VObjectObj*, shared_ptr<VObjectObj>> PrimeObjectManager::all_objects;
+
+		unordered_map<int, shared_ptr<VObjectObj>> PrimeObjectManager::all_objects;
 		unordered_set<shared_ptr<VObjectObj>> PrimeObjectManager::need_rebind_objects;
 		optix::Group PrimeObjectManager::root;
 		optix::Acceleration PrimeObjectManager::acc;
@@ -20,7 +24,7 @@ namespace VRender {
 			auto ptr = (VObjectObj*)Create();
 			auto res = PtrVObjectObj(ptr);
 			
-			all_objects[ptr] = res;
+			all_objects[ptr->id] = res;
 
 			res->MarkDirty();
 

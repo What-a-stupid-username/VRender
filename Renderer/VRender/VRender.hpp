@@ -12,7 +12,9 @@ namespace VRender {
 
 		unique_ptr<VPipeline> pipeline;
 
-		optix::Buffer result;
+		optix::Buffer result = NULL;
+		optix::Buffer target = NULL;
+		optix::Buffer id_mask = NULL;
 
 		mutex mut;
 
@@ -28,6 +30,10 @@ namespace VRender {
 
 		thread render_thread;
 
+		int renderer_post_dispatch_index;
+
+		int selected_object_id = -1;
+
 	protected:
 
 		void PrepareRenderContext() {
@@ -41,6 +47,8 @@ namespace VRender {
 			render_context.target = result;
 			render_context.root = prime::PrimeObjectManager::Root();
 			render_context.lights = prime::PrimeLightManager::LightBuffer();
+
+			context["selected_object_id"]->setInt(selected_object_id);
 		}
 
 	public:
@@ -55,6 +63,11 @@ namespace VRender {
 			PipelineUtility::SetupContext();
 
 			SetResultSize(make_uint2(512, 512));
+
+			renderer_post_dispatch_index = PipelineUtility::AddDispatch("renderer_post");
+
+			PipelineUtility::SetGlobalProperties("ID_MASK", id_mask);
+			PipelineUtility::SetGlobalProperties("TARGET", target);
 
 			render_thread = thread([&]() {
 				int last_time = -1000;
@@ -74,8 +87,10 @@ namespace VRender {
 							try
 							{
 								PrepareRenderContext();
-
 								pipeline->Render(camera, render_context);
+
+								PipelineUtility::SetRenderTarget(result);
+								PipelineUtility::Dispatch<false>(renderer_post_dispatch_index);
 							}
 							catch (const Exception & e)
 							{
@@ -103,17 +118,27 @@ namespace VRender {
 			mut.unlock();
 		}
 
-		optix::Buffer GetRenderResult() {
-			return result;
+		optix::Buffer GetRenderTarget() {
+			return target;
+		}
+		optix::Buffer GetIDMask() {
+			return id_mask;
+		}
+
+		void SetSelectedObject(const int& id) {
+			selected_object_id = id;
 		}
 
 		void SetResultSize(uint2 size) {
 			mut.lock();
 
 			SAFE_RELEASE_OPTIX_OBJ(result);
+			SAFE_RELEASE_OPTIX_OBJ(id_mask);
 
 			resultSize = size;
 			result = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, resultSize.x, resultSize.y, false);
+			target = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, resultSize.x, resultSize.y, false);
+			id_mask = sutil::createOutputBuffer(context, RT_FORMAT_INT, resultSize.x, resultSize.y, false);
 
 			mut.unlock();
 		}

@@ -31,6 +31,7 @@ rtDeclareVariable(float,		t_hit,				rtIntersectionDistance, );
 
 RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 {
+	if (current_prd.depth == 0) current_prd.id = object_id;
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     //float shading_normal = normalTex == 0 ? world_shading_normal : world_shading_normal * ;

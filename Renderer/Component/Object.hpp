@@ -53,6 +53,8 @@ namespace VRender {
 
 		protected:			
 
+			int id;
+
 			optix::GeometryGroup group;
 			optix::Acceleration acc;
 			optix::GeometryInstance instance;
@@ -82,13 +84,13 @@ namespace VRender {
 				return Renderer;
 			}
 
-			VObjectObj() {
+			VObjectObj(const int& id) {
+				this->id = id;
 				auto context = OptixInstance::Instance().Context();
-
 				group = context->createGeometryGroup();
 				acc = context->createAcceleration("Trbvh");
 				instance = context->createGeometryInstance();
-
+				instance["object_id"]->setInt(id);
 				group->addChild(instance);
 				group->setAcceleration(acc);
 
@@ -148,7 +150,7 @@ namespace VRender {
 
 		class PrimeObjectManager {
 
-			static unordered_map<VObjectObj* , shared_ptr<VObjectObj>> all_objects;
+			static unordered_map<int, shared_ptr<VObjectObj>> all_objects;
 
 			static unordered_set<shared_ptr<VObjectObj>> need_rebind_objects;
 			
@@ -160,7 +162,7 @@ namespace VRender {
 			static optix::Group Root() { TryInit(); return root; }
 
 			static void MarkDiry(VObjectObj* obj) {
-				need_rebind_objects.insert(all_objects[obj]);
+				need_rebind_objects.insert(all_objects[obj->id]);
 			}
 
 			static bool RebindObjectComponents() {

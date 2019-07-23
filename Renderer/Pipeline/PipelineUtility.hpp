@@ -61,6 +61,7 @@ namespace VRender {
 			buffer->getSize(target_width, target_height);
 		}
 
+		template<bool isCamera = false>
 		static int AddDispatch(string name) {
 			
 			VDispatch dispatch = VResources::Find<VDispatch>(name);
@@ -73,9 +74,17 @@ namespace VRender {
 			
 			size--;
 			
-			context->setRayGenerationProgram(size, dispatch->rayGenerationProgram);
-			context->setExceptionProgram(size, dispatch->exceptionProgram);
-			context->setMissProgram(size, dispatch->missProgram);
+			try
+			{
+				context->setRayGenerationProgram(size, dispatch->rayGenerationProgram);
+				context->setExceptionProgram(size, dispatch->exceptionProgram);
+				if (isCamera) context->setMissProgram(0, dispatch->missProgram);
+			}
+			catch (const Exception& e)
+			{
+				cout << e.getErrorString() << endl;
+				return -1;
+			}
 
 			return size;
 		}

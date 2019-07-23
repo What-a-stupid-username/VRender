@@ -11,6 +11,7 @@ struct PerRayData_pathtrace
     float3 radiance;
     unsigned int seed;
     int depth;
+	int id;
 	int countEmitted;
 	float importance;
 };
@@ -36,6 +37,7 @@ rtDeclareVariable(unsigned int, rnd_seed, , );
 rtDeclareVariable(float, diffuse_strength, , ) = 1;
 rtDeclareVariable(int, max_depth, , ) = 3;
 
+rtDeclareVariable(int, object_id, , ) = -1;
 
 rtBuffer<Light>     lights;
 
