@@ -26,6 +26,9 @@ Open VRenderer.sln and build the project.
 
 ## Log
 
+* 2019.7.23
+  1. add “pick up”
+  2. fix bug of ".gitignore"
 * 2019.7.20
   1. add scene description file, with an example scene "Cornell Box"
   2. add camera support
