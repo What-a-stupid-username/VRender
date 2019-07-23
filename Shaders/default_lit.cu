@@ -111,7 +111,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				next_ray = make_Ray(hitpoint, p, pathtrace_common_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 
 				rtTrace(top_object, next_ray, prd);
-				current_prd.radiance = prd.radiance * baseColor / max_diffuse;
+				current_prd.radiance = PBS<0>(IN, p, prd.radiance, -ray.direction) / max_diffuse;
 			}
 			else { // ∑¥…‰≤ø∑÷
 				float pd;
@@ -128,7 +128,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 					rtTrace(top_object, next_ray, prd);
 
-					current_prd.radiance = PBS(IN, p, prd.radiance, -ray.direction) / pd / (1 - max_diffuse);
+					current_prd.radiance = PBS<1>(IN, p, prd.radiance, -ray.direction) / pd / (1 - max_diffuse);
 				}
 			}
 			current_prd.radiance *= sum_w * b;
@@ -166,7 +166,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
 				float3 light_satu = light.emission * weight * shadow_prd.inShadow;
-				current_prd.radiance += ((PBS(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor));
+				current_prd.radiance += ((PBS<2>(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor));
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 string:Shader:default_lit
 float3:albedo:1,1,1
 float:metallic:0
-float:smoothness:0
+float:smoothness:0.5
 float:transparent:1

@@ -160,6 +160,7 @@ inline float3 FresnelLerp(const float3 F0, const float3 F90, const float cosA)
 }
 
 
+template<int type>
 float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothness,
 	float3 normal, const float3 viewDir, const float3 lightDir,
 	const float3 lightSatu) {
@@ -191,13 +192,12 @@ float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothne
 
 	specularTerm *= any(specColor) ? 1.0 : 0.0;
 
-
-	float3 color = specularTerm * lightSatu * FresnelTerm(specColor, lh);
-
-	return color;
+	if (type == 0) return diffuseTerm * lightSatu * diffColor;
+	else if (type == 1) return specularTerm * lightSatu * FresnelTerm(specColor, lh);
+	else return diffuseTerm * lightSatu* diffColor + specularTerm * lightSatu * FresnelTerm(specColor, lh);
 }
 
-
+template<int type>
 float3 PBS(const SurfaceInfo IN, const float3 lightDir, const float3 lightSatu, const float3 viewDir) {
 	float3 color;
 
@@ -207,7 +207,8 @@ float3 PBS(const SurfaceInfo IN, const float3 lightDir, const float3 lightSatu, 
 
 	float3 normal = IN.normal;
 
-	color = BRDF(baseColor, specColor, IN.smoothness, normal, viewDir, lightDir, lightSatu);
+	color = BRDF<type>(baseColor, specColor, IN.smoothness, normal, viewDir, lightDir, lightSatu);
+	
 	return color;
 }
 
