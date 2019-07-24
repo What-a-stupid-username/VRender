@@ -1,4 +1,4 @@
-Name:CornellBox
+Name:Cornell Box
 Object:Tall Box|Cube.obj|(1.7, -2, 2)(0, 18, 0)(3, 6, 3)|mirror
 Object:Short Box|Cube.obj|(-2, -3.5, -1)(0, 0, 0)(3, 3, 3)|transparent
 Object:Floor|Quad.obj|(0, -5, 0)(0, 0, 0)(10, 10, 10)
