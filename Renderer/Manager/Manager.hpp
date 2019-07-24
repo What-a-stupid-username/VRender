@@ -48,21 +48,62 @@ namespace VRender {
 
 
 		class VMaterialObj {
-		public:
-			string name;
 			VShader shader;
 			unordered_map<string, VTexture> textures;
 			unordered_map<string, VProperty> properties;
+
+		public:
+			string name;
+			optix::Material material;
 
 			void Load(const string& name);
 		    
 			void Save() { }
 
 			VMaterialObj(const string& name) {
+				material = OptixInstance::Instance().Context()->createMaterial();
 				Load(name);
 			}
 
+			unordered_map<string, VProperty>& Properties() {
+				return properties;
+			}
+
+			void ApplyPropertiesChanged() {
+
+				material->setAnyHitProgram(0, nullptr);
+				material->setAnyHitProgram(1, nullptr);
+				material->setClosestHitProgram(0, nullptr);
+				material->setClosestHitProgram(1, nullptr);
+
+				shader->ApplyShader(material);
+
+				while (material->getVariableCount() != 0)
+				{
+					material->removeVariable(material->getVariable(0));
+				}
+
+				for each (auto pair in properties)
+				{
+					if (pair.second.Type() == "string") {
+						int k1 = pair.first.find('|');
+						if (k1 != -1) {
+							string special_type = pair.first.substr(0, k1);
+							string name = pair.first.substr(k1 + 1, pair.first.length() - k1 - 1);
+							if (special_type == "Texture") {
+								int id = textures[*pair.second.GetData<string>()]->ID();
+								material[name]->setUserData(sizeof(int), (void*)& id);
+							}
+						}
+					}
+					else {
+						pair.second.SetProperty(material, pair.first);
+					}
+				}
+			}
+
 			~VMaterialObj() {
+				material->destroy();
 				textures.clear();
 				for each (auto pair in properties)
 					pair.second.Release();
@@ -146,8 +187,11 @@ namespace VRender {
 
 	class VMaterialManager {
 		static unordered_map<string, weak_ptr<prime::VMaterialObj>> material_cache;
+		static unordered_set<string> dirty_maretial;
 	public:
 		static VMaterial Find(const string& name);
+		static void MarkDirty(shared_ptr<prime::VMaterialObj> material);
+		static bool ApplyAllPropertiesChanged();
 	};
 
 	typedef prime::VMesh VMesh;

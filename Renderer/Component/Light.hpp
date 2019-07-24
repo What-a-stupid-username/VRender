@@ -17,7 +17,8 @@ namespace VRender {
 			float3 position;
 			float3 rotation;
 			float3 scale;
-			float3 emission;
+			float3 color;
+			float emission;
 		};
 		typedef shared_ptr<VLightObj> VLight;
 
@@ -46,7 +47,8 @@ namespace VRender {
 					light->position = make_float3(0, 0, 0);
 					light->rotation = make_float3(0, 0, 0);
 					light->scale = make_float3(1, 1, 1);
-					light->emission = make_float3(15, 15, 15);
+					light->emission = 15;
+					light->color = make_float3(1, 1, 1);
 					lights.push_back(light);
 					int id = lights.size() - 1;
 
@@ -58,7 +60,7 @@ namespace VRender {
 					auto renderer = VComponents::Create<PtrVMeshRenderer>();
 					renderer->SetMaterial(VResources::Find<VMaterial>(mat));
 					obj->SetComponent(renderer);
-					*(obj->MeshRenderer()->GetMaterial()->properties["light_id"].GetData<int>()) = id;
+					obj->GetPrimeInstance()["light_id"]->setInt(id);
 
 					light_objects.push_back(obj);
 
@@ -91,6 +93,7 @@ namespace VRender {
 					{
 						VLight vlight = lights[id];
 
+						light_objects[id]->name = vlight->name;
 						PtrVTransform light_obj_trans = light_objects[id]->Transform();
 						*light_obj_trans->Position<float3>() = vlight->position;
 						*light_obj_trans->Rotation<float3>() = vlight->rotation;
@@ -99,7 +102,7 @@ namespace VRender {
 
 						Light light;
 						light.type = vlight->type;
-						light.emission = vlight->emission;
+						light.emission = vlight->emission * vlight->color;
 
 						Matrix4x4 mat;
 						mat = Matrix4x4::scale(vlight->scale);

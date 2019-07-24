@@ -122,17 +122,16 @@ public:
 class VGUI {
 	VRender::VRenderer& renderer;
 
-	bool show_setting_window = false;
 	bool show_console_window = true;
+	bool show_setting_window = false;
 	bool show_output_window = false;
-	bool show_material_window = false;
-	bool show_shader_window = false;
-	bool show_scene_window = false;
 
 	ImVec2 next_Window_pos;
 	ImVec2 next_Window_pos_2;
 
-	int auto_resize = 0;
+	int auto_resize = 2;
+
+	int selected_obj = -1;
 
 public:
 	ImVec4 back_ground_color = ImVec4(1.f, 0.55f, 1.f, 1.f);
@@ -151,26 +150,26 @@ private:
 	//	//thread([name]() {cout << ; }).detach();d
 	//}
 
-	//void LeftLabelText(string label, string txt) {
-	//	ImGui::Text(label.c_str()); ImGui::SameLine();
-	//	ImGui::Text(txt.c_str());
-	//}
+	void LeftLabelText(string label, string txt) {
+		ImGui::Text(label.c_str()); ImGui::SameLine();
+		ImGui::Text(txt.c_str());
+	}
 
 	void DrawMainMenu() {
 		static float f = 0.0f;
 		static int counter = 0;
 
-		ImGui::Begin("Main Menu", 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove |
+		ImGui::Begin(VRender::VScene::SceneName().c_str(), 0, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove |
 			ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
 			ImGuiWindowFlags_::ImGuiWindowFlags_NoResize);
 		ImGui::SetWindowPos(ImVec2(0, 0));
-		ImGui::SetWindowSize(ImVec2(200, 240));
-		next_Window_pos = ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowWidth(), 0);
-		next_Window_pos_2 = next_Window_pos;
+		ImGui::SetWindowSize(ImVec2(200, 180));
+		next_Window_pos = ImGui::GetWindowPos() + ImVec2(0, ImGui::GetWindowHeight());
+		next_Window_pos_2 = ImGui::GetWindowPos() + ImVec2(ImGui::GetWindowWidth(), 0);
 		needed_size = ImGui::GetWindowSize();
 
 		static float fps = 0;
-		int frame = renderer.Camera()->staticFrameNum;
+		int frame = renderer.GlobalFrameNumber();
 		{
 			static int last_time = 0;
 			static int last_frame = 0;
@@ -181,30 +180,21 @@ private:
 				last_frame = frame;
 			}
 		}
-		ImGui::Text("Render Time: %.1f ms(%.0f FPS)", 1000.f / fps, fps);
-		ImGui::Text("Frame No.%d", frame);
+
+		ImGui::Text("Render Time:");
+		ImGui::Text(" %.1f ms(%.0f FPS)", 1000.f / fps, fps);
+		ImGui::Text("Frame No.%d", renderer.Camera()->staticFrameNum);
 		ImGui::Separator();
 
 		ImGui::Checkbox("Open Console", &show_console_window);
 		ImGui::Checkbox("Open Setting Window", &show_setting_window);
 		ImGui::Checkbox("Open Output Window", &show_output_window);
-		ImGui::Checkbox("Open Material Window", &show_material_window);
-		ImGui::Checkbox("Open Shader View", &show_shader_window);
-		ImGui::Checkbox("Open Scene Window", &show_scene_window);
 
 		ImGui::End();
 	}
 
 	void DrawConsole() {
-		ImGui::Begin("Console", &show_console_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
-		ImGui::SetWindowPos(next_Window_pos);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(300, 260));
-
-		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
-		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
-		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-		float tmp_x = ImGui::GetWindowWidth() + next_Window_pos.x;
-		next_Window_pos_2.x = next_Window_pos_2.x > tmp_x ? next_Window_pos_2.x : tmp_x;
+		DrawWindowRightColum("Console", 100, &show_console_window);
 
 		static bool pause = false;
 		if (pause) {
@@ -226,6 +216,8 @@ private:
 		if (ImGui::Button("Load scene")) { loader_open = true; }
 		if (loader.Draw(needed_size, "txt", loader_open)) {
 			sutil::ClearPtxCache();
+			VRender::VScene::percentage = 0;
+			ImGui::OpenPopup("LoadingScene");
 			thread([&]() {
 				string path = loader.result;
 				loading = true;
@@ -238,59 +230,220 @@ private:
 			}).detach();
 		}
 		if (loading) {
-			ImGui::Begin("Loading: ", 0, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse);
-			ImGui::SetWindowFocus();
-			float v = VRender::VScene::persent;
-			ImGui::ProgressBar(v, ImVec2(200,20));
-			ImGui::End();
+			if (ImGui::BeginPopupModal("LoadingScene", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse))
+			{
+				float v = VRender::VScene::percentage;
+				ImGui::ProgressBar(v, ImVec2(200, 20));
+				ImGui::EndPopup();
+			}
 		}
 
-		//if (ImGui::CollapsingHeader("Result Type"))
-		//{
-		//	if (ImGui::MenuItem("original Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::origial))
-		//		layer.resultType = OptiXLayer::ResultBufferType::origial;
-		//	if (ImGui::MenuItem("tonmap Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::tonemap))
-		//		layer.resultType = OptiXLayer::ResultBufferType::tonemap;
-		//	if (ImGui::MenuItem("denoised Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::denoise))
-		//		layer.resultType = OptiXLayer::ResultBufferType::denoise;
-		//	if (ImGui::MenuItem("helper Buffer", 0, layer.resultType == OptiXLayer::ResultBufferType::helper))
-		//		layer.resultType = OptiXLayer::ResultBufferType::helper;
-		//}
+		ImGui::End();
+	}
 
-		//ImGui::Separator();
+	void DrawInspector() {
+		if (selected_obj == -1) return;
+		DrawWindowRightColum("Inspector", 200);
 
-		//{
-		//	bool k = ImGui::SliderFloatLableOnLeft("Diffuse strength", "", &layer.diffuse_strength, 0, 10, "%.2f");
-		//	if (k) layer.MarkDirty();
-		//}
+		VRender::VObject obj = VRender::VObjectManager::GetObjectByID(selected_obj);
 
-		//static bool post = false;
-		//if (layer.resultType != OptiXLayer::ResultBufferType::origial && layer.resultType != OptiXLayer::ResultBufferType::helper) {
-		//	if (post == false) layer.RebuildCommandList(true);
-		//	ImGui::SliderFloatLableOnLeft("Exposure", "###1", &layer.exposure, 0, 100, "%.4f", 3);
-		//	post = true;
-		//}
-		//else {
-		//	if (post == true) layer.RebuildCommandList(false);
-		//	post = false;
-		//}
+		int light_id = obj->light_id;
+		if (light_id != -1) { // Light
+			VRender::VLight light = VRender::VLightManager::GetLight(light_id);
+			if (ImGui::InputText("Name", &(light->name))) {
+				obj->name = light->name;
+			}
+			ImGui::Separator();
 
-		//ImGui::Separator();
+			string light_id_str = to_string(light_id);
+			bool changed = false;
+			ImGui::Text("Transform");
+			changed |= ImGui::DragFloat3(("Position###pos_input" + light_id_str).c_str(), (float*)&(light->position));
+			changed |= ImGui::DragFloat3(("Rotation###rot_input" + light_id_str).c_str(), (float*) & (light->rotation));
+			changed |= ImGui::DragFloat3(("Scale###sca_input" + light_id_str).c_str(), (float*) & (light->scale));
+			ImGui::Separator();
+			ImGui::Text("Light");
+			changed |= ImGui::ColorEdit3(("Color###color_input" + light_id_str).c_str(), (float*)&(light->color));
+			changed |= ImGui::DragFloat(("Emission###color_input" + light_id_str).c_str(), &light->emission, 1, 0, 100);
+			if (changed) {
+				VRender::VLightManager::MarkDirty(light_id);
+			}
+		}
+		else {
+			string id_str = to_string(selected_obj);
+			{
+				ImGui::InputText("Name", &(obj->name));
+				ImGui::Separator();
+			}
+			{
 
-		//{
-		//	bool k = ImGui::SliderInt("###2", &layer.max_depth, 0, 10, "max tracing depth = %d");
-		//	if (k) layer.MarkDirty();
-		//}
+				ImGui::Text("Transform");
+				auto trans = obj->Transform();
+				bool changed = false;
+				changed |= ImGui::DragFloat3(("Position###pos_input" + id_str).c_str(), trans->Position<float>());
+				changed |= ImGui::DragFloat3(("Rotation###rot_input" + id_str).c_str(), trans->Rotation<float>());
+				changed |= ImGui::DragFloat3(("Scale###sca_input" + id_str).c_str(), trans->Scale<float>(), 0.01, 0);
+				if (changed) {
+					trans->MarkDirty();
+				}
+				ImGui::Separator();
+			}
+			{
+				ImGui::Text("MeshRenderer");
+				auto mat = obj->MeshRenderer()->GetMaterial();
 
-		//{
-		//	int sample_num_per_pixel = layer.sqrt_num_samples * layer.sqrt_num_samples;
-		//	ImGui::SliderInt("###3", &sample_num_per_pixel, 1, 16, "sample num per pixel = %d");
-		//	layer.sqrt_num_samples = sqrt(sample_num_per_pixel);
-		//}
+				bool changed = false;
 
-		//ImGui::Checkbox("Cut off high varient result", &layer.cut_off_high_variance_result);
+				int index = 0;
+				auto& properties = mat->Properties();
+				for each (auto pair in properties)
+				{
+					if (pair.second.Type() == "int") {
+						changed |= ImGui::InputInt((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<int>());
+					}
+					else if (pair.second.Type() == "string") {
+						if (pair.first == "Shader") {
+							LeftLabelText(pair.first + ":  ", pair.second.GetData<string>()->c_str());
+						}
+						else {
+							ImGui::InputText((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<string>());
+						}
+					}
+					else if (pair.second.Type() == "float") {
+						changed |= ImGui::DragFloat((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>(), 0.001, 0, 1);
+					}
+					else if (pair.second.Type() == "float2") {
+						changed |= ImGui::DragFloat2((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>(), 0.001, 0, 1);
+					}
+					else if (pair.second.Type() == "float3") {
+						if (pair.first[0] == '!') {
+							changed |= ImGui::InputFloat3((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>());
+						}
+						else {
+							changed |= ImGui::ColorEdit3((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>());
+						}
+					}
+					else if (pair.second.Type() == "float4") {
+						if (pair.first[0] == '!') {
+							changed |= ImGui::InputFloat4((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>());
+
+						}
+						else {
+							changed |= ImGui::ColorEdit4((pair.first + "###Mat_prop" + to_string(index)).c_str(), pair.second.GetData<float>());
+						}
+					}
+					index++;
+				}
+				if (changed) {
+					VRender::VMaterialManager::MarkDirty(mat);
+				}
+				ImGui::Separator();
+			}
+			{
+				ImGui::Text("MeshFilter");
+				LeftLabelText("Mesh:  ", obj->MeshFilter()->GetMesh()->name);
+			}
+		}
+
 
 		ImGui::End();
+	}
+
+
+	bool right_click_on_item;
+	void DrawHierarchy() {
+		DrawWindowLeftColum("Hierarchy", 400);
+			   
+		auto objects = VRender::VObjectManager::GetAllObjects();
+		
+		if (ImGui::IsMouseHoveringWindow() && ImGui::IsMouseReleased(0)) {
+			selected_obj = -1;
+		}
+
+		right_click_on_item = false;
+		for each (auto obj in objects)
+		{
+			DisplayNode(obj);
+		}
+
+		if (ImGui::IsMouseHoveringWindow() && ImGui::IsMouseReleased(1) && !right_click_on_item) {
+			ImGui::OpenPopup("CreateObject");
+		}
+		if (ImGui::BeginPopup("EditObject"))
+		{
+			string names[3] = { "Delete","Copy","Paste" };
+			for (int i = 0; i < 3; i++)
+				if (ImGui::Selectable(names[i].c_str())) {
+					switch (i)
+					{
+					case 0:
+						break;
+					case 1:
+						break;
+					case 2:
+						break;
+					default:
+						break;
+					}
+				}
+			ImGui::EndPopup();
+		}
+
+		if (ImGui::BeginPopup("CreateObject"))
+		{
+			string names[3] = { "Create", "XX", "XX"};
+			for (int i = 0; i < 3; i++)
+				if (ImGui::Selectable(names[i].c_str())) {
+					switch (i)
+					{
+					case 0:
+						break;
+					case 1:
+						break;
+					case 2:
+						break;
+					default:
+						break;
+					}
+				}
+			ImGui::EndPopup();
+		}
+
+		ImGui::End();
+	}
+
+	void DisplayNode(std::pair<const int, VRender::VObject> pair) {
+		string id_str = to_string(pair.first);
+		bool selected = false;
+		if (pair.first == selected_obj) selected = true;
+		if (ImGui::Selectable((pair.second->name + "###Object" + id_str).c_str(), &selected)) {
+			selected_obj = pair.first;
+		}
+		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(1)) {
+			selected_obj = pair.first;
+			right_click_on_item = true;
+			ImGui::OpenPopup("EditObject");
+		}
+	}
+
+	void DrawWindowRightColum(string name, int height, bool* show = NULL) {
+		ImGui::Begin(name.c_str(), show, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::SetWindowPos(next_Window_pos_2);
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, height));
+
+		next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
+	}
+
+	void DrawWindowLeftColum(string name, int height, bool* show = NULL) {
+		ImGui::Begin(name.c_str(), show, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
+		ImGui::SetWindowPos(next_Window_pos);
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(200, height));
+
+		next_Window_pos = next_Window_pos + ImVec2(0, ImGui::GetWindowHeight());
+		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
+		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
 	}
 
 	//void DrawSettings() {
@@ -476,67 +629,6 @@ private:
 	//	ImGui::End();
 	//}
 
-	//void DrawScene() {
-	//	ImGui::Begin("Scene", &show_scene_window, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
-
-	//	ImGui::SetWindowPos(next_Window_pos_2);
-
-	//	auto & mat_table = VMaterial::GetAllMaterials();
-
-	//	if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, 200));
-
-	//	next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
-	//	auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
-	//	needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
-
-	//	static string scene_path = "Default Cornell";
-	//	static FileLoader fl;
-	//	static bool openFile = false;
-	//	ImGui::Text(scene_path.c_str());
-	//	ImGui::SameLine();
-	//	if (ImGui::Button("Open scene")) { openFile = true; };
-	//	if (fl.Draw(needed_size, ".scene", openFile)) {
-	//		scene_path = fl.result;
-	//		VScene::LoadScene(scene_path);
-	//	}
-	//	ImGui::Separator();
-
-	//	VTransform* root = VScene::root;
-
-	//	int index = 0;
-	//	if (root != NULL) {
-	//		for each (auto child in root->Childs())
-	//		{
-	//			DisplayNode(index, child);
-	//		}
-	//	}
-
-
-	//	ImGui::End();
-	//}
-
-	//void DisplayNode(int& gui_id, VTransform * trans) {
-	//	string name = trans->Object()->name;
-	//	name = name + "###" + to_string(gui_id);
-	//	if (ImGui::TreeNode(name.c_str())) {
-	//		bool changed = false;
-	//		changed |= ImGui::DragFloat3(("Position###pos_input" + to_string(gui_id)).c_str(), trans->Position<float>());
-	//		changed |= ImGui::DragFloat3(("Rotation###rot_input" + to_string(gui_id)).c_str(), trans->Rotation<float>());
-	//		changed |= ImGui::DragFloat3(("Scale###sca_input" + to_string(gui_id)).c_str(), trans->Scale<float>(), 0.01, 0);
-	//		gui_id++;
-	//		if (changed) trans->MarkDirty();
-
-	//		for each (auto child in trans->Childs())
-	//		{
-	//			DisplayNode(gui_id, child);
-	//		}
-	//		ImGui::TreePop();
-	//	}
-	//	else {
-	//		gui_id++;
-	//	}
-	//}
-
 
 public:
 	VGUI() : renderer(VRender::VRenderer::Instance()) {
@@ -548,25 +640,16 @@ public:
 
 	void OnDrawGUI() {
 
-		// Main Menu
+		// Left column
 		DrawMainMenu();
+		
+		int tp_selected_obj = selected_obj = renderer.GetSelectedObject();		
+		DrawHierarchy();
+		if (selected_obj != tp_selected_obj) renderer.SetSelectedObject(selected_obj);
 
-		// Console
+		// Right column
 		if (show_console_window) DrawConsole();
-
-		//// Settings
-		//if (show_setting_window) DrawSettings();
-
-		//// Output
-		//if (show_output_window) DrawOutput();
-
-		//// Shader
-		//if (show_shader_window) DrawShader();
-
-		//// Scene
-		//if (show_scene_window) DrawScene();
-
-		//// Material
-		//if (show_material_window) DrawMaterial();
+		DrawInspector();
+		
 	}
 };

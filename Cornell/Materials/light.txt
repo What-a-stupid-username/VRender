@@ -1,2 +1,1 @@
 string:Shader:default_light
-int:light_id:-1

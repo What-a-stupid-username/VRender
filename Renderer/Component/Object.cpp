@@ -12,7 +12,7 @@ namespace VRender {
 		}
 
 
-		unordered_map<int, shared_ptr<VObjectObj>> PrimeObjectManager::all_objects;
+		map<int, shared_ptr<VObjectObj>> PrimeObjectManager::all_objects;
 		unordered_set<shared_ptr<VObjectObj>> PrimeObjectManager::need_rebind_objects;
 		optix::Group PrimeObjectManager::root;
 		optix::Acceleration PrimeObjectManager::acc;

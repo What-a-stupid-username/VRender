@@ -34,15 +34,24 @@ namespace VRender {
 
 		int selected_object_id = -1;
 
+		int frame = 0;
+
 	protected:
 
 		void PrepareRenderContext() {
-			bool changed = prime::PrimeLightManager::RegenerateLightBuffer();
+
+			bool changed = VMaterialManager::ApplyAllPropertiesChanged();
+
+			changed |= prime::PrimeLightManager::RegenerateLightBuffer();
+
+			changed |= prime::PrimeObjectManager::RebindObjectComponents();
 
 			changed |= prime::PrimeComponentManager::ApplyChanges();
 
-			changed |= prime::PrimeObjectManager::RebindObjectComponents();
-			if (changed) prime::PrimeObjectManager::Root()->getAcceleration()->markDirty();
+			if (changed) {
+				prime::PrimeObjectManager::Root()->getAcceleration()->markDirty();
+				camera->staticFrameNum = 0;
+			}
 			
 			render_context.target = result;
 			render_context.root = prime::PrimeObjectManager::Root();
@@ -91,6 +100,7 @@ namespace VRender {
 
 								PipelineUtility::SetRenderTarget(result);
 								PipelineUtility::Dispatch<false>(renderer_post_dispatch_index);
+								frame++;
 							}
 							catch (const Exception & e)
 							{
@@ -102,6 +112,20 @@ namespace VRender {
 						{
 							Sleep(100);
 						}
+					}
+					if (pipeline != nullptr) {
+						mut.lock();
+						try
+						{
+							PrepareRenderContext();
+							PipelineUtility::SetRenderTarget(result);
+							PipelineUtility::Dispatch<false>(renderer_post_dispatch_index);
+						}
+						catch (const Exception& e)
+						{
+							cout << e.getErrorString() << endl;
+						}
+						mut.unlock();
 					}
 					Sleep(100);
 				}
@@ -127,6 +151,13 @@ namespace VRender {
 
 		void SetSelectedObject(const int& id) {
 			selected_object_id = id;
+		}
+		int GetSelectedObject() {
+			return  selected_object_id;
+		}
+
+		int GlobalFrameNumber() {
+			return frame;
 		}
 
 		void SetResultSize(uint2 size) {

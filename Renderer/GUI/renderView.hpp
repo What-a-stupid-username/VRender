@@ -6,6 +6,7 @@
 // Mouse state
 int2	mouse_prev_pos;
 int2	mouse_press_pos;
+bool	moved_since_pressed;
 int		mouse_button;
 
 int* id_buffer = NULL;
@@ -22,21 +23,23 @@ void glutMousePress(int button, int state, int x, int y)
 		mouse_button = button;
 		mouse_prev_pos = make_int2(x, y);
 		mouse_press_pos = make_int2(x, y);
+		moved_since_pressed = false;
 	}
 	else if (state == GLUT_UP)
 	{
 		mouse_button = -1;
-		if (button == GLUT_LEFT_BUTTON) {
-			if (abs(x - mouse_press_pos.x) + abs(y - mouse_press_pos.y) > 10) return;
-			VRender::VRenderer & renderer = VRender::VRenderer::Instance();
-			optix::Buffer id_mask = renderer.GetIDMask();
-			renderer.Lock();
-			RTsize w, h; id_mask->getSize(w, h);
-			int* id_buffer_ = (int*)id_mask->map();
-			memcpy(id_buffer, id_buffer_, sizeof(int) * w * h);
-			id_mask->unmap();
-			renderer.Unlock();
-			renderer.SetSelectedObject(id_buffer[(h - y) * w + x]);
+		if (!moved_since_pressed) {
+			if (button == GLUT_LEFT_BUTTON) {
+				VRender::VRenderer& renderer = VRender::VRenderer::Instance();
+				optix::Buffer id_mask = renderer.GetIDMask();
+				renderer.Lock();
+				RTsize w, h; id_mask->getSize(w, h);
+				int* id_buffer_ = (int*)id_mask->map();
+				memcpy(id_buffer, id_buffer_, sizeof(int) * w * h);
+				id_mask->unmap();
+				renderer.Unlock();
+				renderer.SetSelectedObject(id_buffer[(h - y) * w + x]);
+			}
 		}
 	}
 }
@@ -45,6 +48,7 @@ void glutMousePress(int button, int state, int x, int y)
 
 void glutMouseMotion(int x, int y)
 {
+	if (abs(x - mouse_press_pos.x) + abs(y - mouse_press_pos.y) > 10) moved_since_pressed = true;
 	int mod = glutGetModifiers();
 
 	const float2 from = { static_cast<float>(mouse_prev_pos.x),
@@ -71,28 +75,22 @@ void glutMouseMotion(int x, int y)
 			pos = forward * -5 + ori;
 			ri = cross(forward, float3{ 0,1,0 });
 			up = cross(ri, forward);
-			VRender::VRenderer::Instance().Lock();
 			cam->position = pos;
 			cam->forward = forward;
 			cam->up = up;
 			cam->right = ri;
 			cam->dirty = true;
-			VRender::VRenderer::Instance().Unlock();
 		}
 		else if (mouse_button == GLUT_RIGHT_BUTTON) //缩放
 		{
-			VRender::VRenderer::Instance().Lock();
 			cam->position += cam->forward * del.y * 10;
 			cam->dirty = true;
-			VRender::VRenderer::Instance().Unlock();
 
 		}
 		else //平移
 		{
-			VRender::VRenderer::Instance().Lock();
 			cam->position += (cam->right * -del.x + cam->up * del.y) * 10;
 			cam->dirty = true;
-			VRender::VRenderer::Instance().Unlock();
 		}
 	}
 	else 
@@ -106,12 +104,10 @@ void glutMouseMotion(int x, int y)
 			forward = normalize(forward + (cam->right * -del.x + cam->up * del.y) * 2);
 			ri = cross(forward, float3{ 0,1,0 });
 			up = cross(ri, forward);
-			VRender::VRenderer::Instance().Lock();
 			cam->forward = forward;
 			cam->up = up;
 			cam->right = ri;
 			cam->dirty = true;
-			VRender::VRenderer::Instance().Unlock();
 		}
 		else if (mouse_button == GLUT_LEFT_BUTTON) //选取
 		{
@@ -119,10 +115,8 @@ void glutMouseMotion(int x, int y)
 		}
 		else//平移
 		{		
-			VRender::VRenderer::Instance().Lock();
 			cam->position += (cam->right * -del.x + cam->up * del.y) * 10;
 			cam->dirty = true;
-			VRender::VRenderer::Instance().Unlock();
 		}
 	}
 

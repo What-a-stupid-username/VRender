@@ -64,11 +64,7 @@ namespace VRender {
 				}
 			};
 		#pragma endregion
-
-		protected:
-			
-			bool dirty = true;
-
+						
 		public:
 			template<typename T>
 			static T Create() {

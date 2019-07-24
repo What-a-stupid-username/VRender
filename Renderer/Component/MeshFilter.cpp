@@ -11,8 +11,12 @@ namespace VRender {
 			geo_triangle->setAttributeProgram(instance.AttributeProgram());
 		}
 
+		VMesh VMeshFilter::GetMesh() {
+			return mesh;
+		}
+
 		void VMeshFilter::SetMesh(const VMesh& mesh) {
-			dirty = true;
+			MarkDirty();
 
 			this->mesh = mesh;
 

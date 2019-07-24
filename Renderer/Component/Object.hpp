@@ -138,6 +138,9 @@ namespace VRender {
 				MarkDirty();
 			}
 
+			optix::GeometryInstance GetPrimeInstance() {
+				return instance;
+			}
 
 			~VObjectObj() {
 				SAFE_RELEASE_OPTIX_OBJ(group);
@@ -150,7 +153,7 @@ namespace VRender {
 
 		class PrimeObjectManager {
 
-			static unordered_map<int, shared_ptr<VObjectObj>> all_objects;
+			static map<int, shared_ptr<VObjectObj>> all_objects;
 
 			static unordered_set<shared_ptr<VObjectObj>> need_rebind_objects;
 			
@@ -165,6 +168,10 @@ namespace VRender {
 				need_rebind_objects.insert(all_objects[obj->id]);
 			}
 
+			static PtrVObjectObj GetObjectByID(const int id) {
+				return all_objects[id];
+			}
+
 			static bool RebindObjectComponents() {
 				if (need_rebind_objects.empty()) return false;
 				for each (auto obj in need_rebind_objects) {
@@ -172,6 +179,10 @@ namespace VRender {
 				}
 				need_rebind_objects.clear();
 				return true;
+			}
+
+			static map<int, shared_ptr<VObjectObj>> GetAllObjects() {
+				return all_objects;
 			}
 
 			static void RegenerateGraph() {
@@ -215,5 +226,7 @@ namespace VRender {
 	public:
 		static VObject CreateNewObject() { return prime::PrimeObjectManager::CreateNewObject(); };
 		static void RemoveAll() { prime::PrimeObjectManager::RemoveAll(); }
+		static map<int, VObject> GetAllObjects() { return prime::PrimeObjectManager::GetAllObjects(); };
+		static VObject GetObjectByID(const int& id) { return prime::PrimeObjectManager::GetObjectByID(id); }
 	};
 }

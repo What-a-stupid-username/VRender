@@ -17,9 +17,10 @@ rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );
 RT_PROGRAM void default_light_ClosestHit() //ray-type = 0(normal_ray)
 {
+	float3 normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));
 	if (current_prd.depth == 0) current_prd.id = object_id;
 	float3 emission_color = lights[light_id].emission;
-	if (dot(ray.direction, geometric_normal) > 0)
+	if (dot(ray.direction, normal) < 0)
 		current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
 }
 

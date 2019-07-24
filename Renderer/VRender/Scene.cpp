@@ -2,7 +2,7 @@
 
 namespace VRender {
 	string VScene::name;
-	atomic<float> VScene::persent = 0;
+	atomic<float> VScene::percentage = 0;
 	vector<string> VScene::split(const string& str, const string& delim) {
 		vector<string> res;
 		if ("" == str) return res;
@@ -83,7 +83,11 @@ namespace VRender {
 		light->position = make_float3(px, py, pz);
 		light->rotation = make_float3(rx, ry, rz);
 		light->scale = make_float3(sx, sy, sz);
-		light->emission = make_float3(cx, cy, cz);
+		float3 light_emmision = make_float3(cx, cy, cz);
+		float max_comp = max<float>(light_emmision.x, max<float>(light_emmision.y, light_emmision.z));
+		if (max_comp <= 1) max_comp = 1;
+		light->color = light_emmision / max_comp;
+		light->emission = max_comp;
 	}
 	void VScene::ProcessCamera(const string& data) {
 

@@ -337,6 +337,7 @@ namespace VRender {
 
 
 	unordered_map<string, weak_ptr<prime::VMaterialObj>> VMaterialManager::material_cache;
+	unordered_set<string> VMaterialManager::dirty_maretial;
 
 	VMaterial VMaterialManager::Find(const string& name) {
 		do
@@ -356,10 +357,25 @@ namespace VRender {
 
 		auto mat = VMaterial(new prime::VMaterialObj(name));
 		material_cache[name] = mat;
+		MarkDirty(mat);
 		return mat;
 	}
+	void VMaterialManager::MarkDirty(shared_ptr<prime::VMaterialObj> material) {
+		dirty_maretial.insert(material->name);
+	}
 
-
+	bool VMaterialManager::ApplyAllPropertiesChanged() {
+		if (dirty_maretial.empty()) return false;
+		for each (auto name in dirty_maretial)
+		{
+			auto mat = material_cache[name];
+			if (!mat.expired()) {
+				mat.lock()->ApplyPropertiesChanged();
+			}
+		}
+		dirty_maretial.clear();
+		return true;
+	}
 
 	unordered_map<string, weak_ptr<prime::VMeshObj>> VMeshManager::mesh_cache;
 

@@ -21,6 +21,8 @@ namespace VRender {
 		public:
 			void SetMesh(const VMesh & mesh);
 
+			VMesh GetMesh();
+
 			void Rebind(optix::GeometryInstance instance) { instance->setGeometryTriangles(geo_triangle); };
 
 			void ApplyPropertiesChanged() {};

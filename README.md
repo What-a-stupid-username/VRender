@@ -26,6 +26,9 @@ Open VRenderer.sln and build the project.
 
 ## Log
 
+* 2019.7.24
+  1. add “Hierarchy” and “Inspector”
+  2. fix bug of “default_light”
 * 2019.7.23
   1. add “pick up”
   2. fix bug of ".gitignore"

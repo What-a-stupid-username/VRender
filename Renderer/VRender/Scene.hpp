@@ -39,12 +39,13 @@ namespace VRender {
 
 
 	public:
-		static atomic<float> persent;
+		static atomic<float> percentage;
 
 		static string SceneName() { return name; }
 
 		static bool LoadScene(string path) {
 			
+			VRender::VRenderer::Instance().SetSelectedObject(-1);
 			VObjectManager::RemoveAll();
 			VLightManager::RemoveAll();
 			prime::PrimeComponentManager::Clear();
@@ -67,7 +68,7 @@ namespace VRender {
 				for each (string str in lines) {
 					ProcessLine(str);
 					line++;
-					persent = (float)line / lines.size();
+					percentage = (float)line / lines.size();
 				}
 
 				fin.close();
