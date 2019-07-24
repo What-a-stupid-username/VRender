@@ -237,6 +237,11 @@ private:
 				ImGui::EndPopup();
 			}
 		}
+		float fov = renderer.Camera()->fov.x;
+		if (ImGui::DragFloat("Camera Fov", &fov, 1, 0, 90, "%.1f")) {
+			renderer.Camera()->fov = make_float2(fov);
+			renderer.Camera()->staticFrameNum = 0;
+		}
 
 		ImGui::End();
 	}
@@ -258,9 +263,9 @@ private:
 			string light_id_str = to_string(light_id);
 			bool changed = false;
 			ImGui::Text("Transform");
-			changed |= ImGui::DragFloat3(("Position###pos_input" + light_id_str).c_str(), (float*)&(light->position));
-			changed |= ImGui::DragFloat3(("Rotation###rot_input" + light_id_str).c_str(), (float*) & (light->rotation));
-			changed |= ImGui::DragFloat3(("Scale###sca_input" + light_id_str).c_str(), (float*) & (light->scale));
+			changed |= ImGui::DragFloat3(("Position###pos_input" + light_id_str).c_str(), (float*)&(light->position), 0.1);
+			changed |= ImGui::DragFloat3(("Rotation###rot_input" + light_id_str).c_str(), (float*) & (light->rotation), 0.1);
+			changed |= ImGui::DragFloat3(("Scale###sca_input" + light_id_str).c_str(), (float*) & (light->scale), 0.01, 0);
 			ImGui::Separator();
 			ImGui::Text("Light");
 			changed |= ImGui::ColorEdit3(("Color###color_input" + light_id_str).c_str(), (float*)&(light->color));
@@ -280,8 +285,8 @@ private:
 				ImGui::Text("Transform");
 				auto trans = obj->Transform();
 				bool changed = false;
-				changed |= ImGui::DragFloat3(("Position###pos_input" + id_str).c_str(), trans->Position<float>());
-				changed |= ImGui::DragFloat3(("Rotation###rot_input" + id_str).c_str(), trans->Rotation<float>());
+				changed |= ImGui::DragFloat3(("Position###pos_input" + id_str).c_str(), trans->Position<float>(),0.1);
+				changed |= ImGui::DragFloat3(("Rotation###rot_input" + id_str).c_str(), trans->Rotation<float>(), 0.1);
 				changed |= ImGui::DragFloat3(("Scale###sca_input" + id_str).c_str(), trans->Scale<float>(), 0.01, 0);
 				if (changed) {
 					trans->MarkDirty();
@@ -429,8 +434,8 @@ private:
 	void DrawWindowRightColum(string name, int height, bool* show = NULL) {
 		ImGui::Begin(name.c_str(), show, ImGuiWindowFlags_::ImGuiWindowFlags_NoMove | ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse | auto_resize);
 		ImGui::SetWindowPos(next_Window_pos_2);
-		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(400, height));
-
+		if (auto_resize == 2) ImGui::SetWindowSize(ImVec2(250, height));
+		
 		next_Window_pos_2 = next_Window_pos_2 + ImVec2(0, ImGui::GetWindowHeight());
 		auto tmp = ImGui::GetWindowPos() + ImGui::GetWindowSize();
 		needed_size = ImVec2(max(needed_size.x, tmp.x), max(needed_size.y, tmp.y));
