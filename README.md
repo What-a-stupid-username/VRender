@@ -2,7 +2,7 @@
 
 ## Introduction
 
-VRenderer is a RT/PM renderer based on OptiX and CUDA, accelerated by RTX tech of NVIDIA.
+VRenderer is a PT/PM renderer based on OptiX and CUDA, accelerated by RTX tech of NVIDIA.
 
 ![box](./Pics/box.PNG)
 
