@@ -182,6 +182,7 @@ void glutInitialize(int* argc, char** argv)
 
 void glutExitProgram() {
 	free(id_buffer);
+	VRender::VRenderer::Instance().SetSelectedObject(-1);
 }
 
 void glutRun()
