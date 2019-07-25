@@ -9,12 +9,13 @@ namespace VRender {
 	namespace prime {
 		class VTransformHandle {
 			VMesh mesh;
-			VMaterial mat;
+			VShader shader;
 			optix::Transform trans;
 			optix::GeometryGroup group;
 			optix::Acceleration acc;
 			optix::GeometryInstance instance;
 			optix::GeometryTriangles triangle;
+			optix::Material	mat;
 
 		public:
 			optix::Transform GetPrime() {
@@ -22,20 +23,26 @@ namespace VRender {
 			}
 
 			VTransformHandle() {
+				mesh = VMeshManager::Find("Axis.obj");
+				shader = VShaderManager::Find("axis");
+
 				auto& context = OptixInstance::Instance().Context();
 				trans = context->createTransform();
-				group = context->createGroup();
+				group = context->createGeometryGroup();
 				acc = context->createAcceleration("Trbvh");
 				instance = context->createGeometryInstance();
 				triangle = context->createGeometryTriangles();
+				mat = context->createMaterial(); 
+				shader->ApplyShader(mat);
 				trans->setChild(group);
 				group->setAcceleration(acc);
 				group->addChild(instance);
 				instance->setGeometryTriangles(triangle);
-				instance->addMaterial(mat->material);
+				instance->addMaterial(mat);
 				
 				RTsize size = -1; mesh->v_index_buffer->getSize(size);
-				if (size == -1) throw Exception("Error mesh!");
+				if (size == -1) throw Exception("Error mesh!");			
+				triangle->setAttributeProgram(OptixInstance::Instance().AttributeProgram());
 				triangle->setPrimitiveCount(size);
 				mesh->vert_buffer->getSize(size);
 				triangle->setVertices(size, mesh->vert_buffer, RT_FORMAT_FLOAT3);
@@ -96,6 +103,9 @@ namespace VRender {
 
 		int frame = 0;
 
+		bool  low_priority = false;
+		int draw_handle = true;
+
 	protected:
 
 		void PrepareRenderContext() {
@@ -118,6 +128,20 @@ namespace VRender {
 			render_context.lights = prime::PrimeLightManager::LightBuffer();
 
 			context["selected_object_id"]->setInt(selected_object_id);
+
+			if (selected_object_id != -1) {
+				float matrix[16] = { 0 };
+				float3 pos = *VObjectManager::GetObjectByID(selected_object_id)->Transform()->Position<float3>();
+				float3 cam_pos = camera->position;
+				float3 dis = pos - cam_pos;
+				dis.x = dis.x * dis.x + dis.y * dis.y + dis.z * dis.z;
+				dis.x = sqrt(dis.x);
+				matrix[3] = pos.x, matrix[7] = pos.y, matrix[11] = pos.z;
+				matrix[0] = matrix[5] = matrix[10] = 0.2 * dis.x; matrix[15] = 1;
+				transform_handle->GetPrime()->setMatrix(false, matrix, NULL);
+				context["draw_handle"]->setInt(draw_handle);
+			}
+
 		}
 
 	public:
@@ -139,7 +163,7 @@ namespace VRender {
 
 			PipelineUtility::SetGlobalProperties("ID_MASK", id_mask);
 			PipelineUtility::SetGlobalProperties("TARGET", target);
-			PipelineUtility::SetGlobalProperties("handle_object", transform_handle->GetPrime());
+			context["handle_object"]->set(transform_handle->GetPrime());
 
 			render_thread = thread([&]() {
 				int last_time = -1000;
@@ -155,6 +179,7 @@ namespace VRender {
 						}
 						last_time = now_time;
 						if (pipeline != nullptr) {
+							if (low_priority) continue;
 							mut.lock();
 							try
 							{
@@ -177,6 +202,7 @@ namespace VRender {
 						}
 					}
 					if (pipeline != nullptr) {
+						if (low_priority) continue;
 						mut.lock();
 						try
 						{
@@ -241,10 +267,20 @@ namespace VRender {
 			render = enable;
 		}
 
+		void EnableHandle(bool enable) {
+			draw_handle = enable ? 1 : 0;
+		}
+
 		VCamera Camera() { return camera; }
 
-		void Lock() { mut.lock(); }
-		void Unlock() { mut.unlock(); }
+		void Lock() {
+			low_priority = true;
+			mut.lock(); 
+		}
+		void Unlock() {
+			low_priority = false;
+			mut.unlock(); 
+		}
 		void Join() { end = true; render_thread.join(); }
 	};
 }

@@ -248,7 +248,7 @@ private:
 
 	void DrawInspector() {
 		if (selected_obj <= -1) return;
-		DrawWindowRightColum("Inspector", 200);
+		DrawWindowRightColum("Inspector", 400);
 
 		VRender::VObject obj = VRender::VObjectManager::GetObjectByID(selected_obj);
 
