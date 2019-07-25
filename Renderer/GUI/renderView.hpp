@@ -39,6 +39,7 @@ void glutMousePress(int button, int state, int x, int y)
 				id_mask->unmap();
 				renderer.Unlock();
 				renderer.SetSelectedObject(id_buffer[(h - y) * w + x]);
+				cout << id_buffer[(h - y) * w + x];
 			}
 		}
 	}

@@ -13,7 +13,7 @@ rtDeclareVariable(float3,			camera_right, , );
 rtDeclareVariable(float2,			camera_fov, , );
 rtDeclareVariable(unsigned int,		camera_staticFrameNum, , );
 rtDeclareVariable(unsigned int,		sqrt_num_samples, , ) = 1;
-rtDeclareVariable(unsigned int,		cut_off_high_variance_result, , ) = 0;
+rtDeclareVariable(unsigned int,		cut_off_high_variance_result, , ) = 1;
 
 
 rtBuffer<float4, 2>              V_TARGET0;
