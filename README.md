@@ -6,7 +6,7 @@ VRenderer is a PT/PM renderer based on OptiX and CUDA, accelerated by RTX tech o
 
 ![box](./Pics/box.PNG)
 
-![renderer](./Pics/renderer.png)
+![renderer](./Pics/scene_editor.PNG)
 
 ## BUILD
 
@@ -25,7 +25,8 @@ Open CMake, click Configure, change the generator of CMake to VS2017/2019 Win64.
 Open VRenderer.sln and build the project.
 
 ## Log
-
+* 2019.7.25
+  1. add “Handle” to scene editor
 * 2019.7.24
   1. add “Hierarchy” and “Inspector”
   2. fix bug of “default_light”
