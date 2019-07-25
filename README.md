@@ -26,7 +26,7 @@ Open VRenderer.sln and build the project.
 
 ## Log
 * 2019.7.25
-  1. add “Handle”to scene editor
+  1. add “Handle” to scene editor
 * 2019.7.24
   1. add “Hierarchy” and “Inspector”
   2. fix bug of “default_light”
