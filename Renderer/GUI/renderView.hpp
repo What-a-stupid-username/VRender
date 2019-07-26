@@ -164,7 +164,6 @@ void glutMouseMotion(int x, int y)
 					float3 point0 = GetNearestPointOfSpehereByRay(obj_pos, cam_pos, ray_dir) - obj_pos;
 					float3 tangent =  cross(normalize(point0), axle);
 					float2 tanget_screen = normalize(make_float2(dot(tangent, cam->right), dot(tangent, cam->up)));
-					cout << tanget_screen << endl;
 					float3 bias = dot(del, tanget_screen) * axle * -100;
 					renderer.Lock();
 					if (selected_obect->light_id != -1) {

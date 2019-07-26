@@ -137,7 +137,7 @@ namespace VRender {
 				dis.x = dis.x * dis.x + dis.y * dis.y + dis.z * dis.z;
 				dis.x = sqrt(dis.x);
 				matrix[3] = pos.x, matrix[7] = pos.y, matrix[11] = pos.z;
-				matrix[0] = matrix[5] = matrix[10] = 0.2 * dis.x; matrix[15] = 1;
+				matrix[0] = matrix[5] = matrix[10] = 0.25 * dis.x; matrix[15] = 1;
 				transform_handle->GetPrime()->setMatrix(false, matrix, NULL);
 				context["draw_handle"]->setInt(draw_handle);
 			}
