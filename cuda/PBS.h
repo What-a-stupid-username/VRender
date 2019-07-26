@@ -178,7 +178,7 @@ float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothne
 	float lv = saturate(dot(lightDir, viewDir));
 	float lh = saturate(dot(lightDir, floatDir));
 
-	float diffuseTerm = DisneyDiffuse(nv, nl, lh, perceptualRoughness) * nl;
+	float diffuseTerm = DisneyDiffuse(nv, nl, lh, perceptualRoughness);
 
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
@@ -194,7 +194,7 @@ float3 BRDF(const float3 diffColor, const float3 specColor, const float smoothne
 
 	if (type == 0) return diffuseTerm * lightSatu * diffColor;
 	else if (type == 1) return specularTerm * lightSatu * FresnelTerm(specColor, lh);
-	else return diffuseTerm * lightSatu* diffColor + specularTerm * lightSatu * FresnelTerm(specColor, lh);
+	else return diffuseTerm * nl * lightSatu* diffColor + specularTerm * lightSatu * FresnelTerm(specColor, lh);
 }
 
 template<int type>

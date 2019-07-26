@@ -4,7 +4,7 @@
 #include "default_pipeline.hpp"
 #include "VRender/Scene.hpp"
 
-#include "GUI/renderView.hpp"
+#include "GUI/RenderView.hpp"
 #include "GUI/DXWrapper.hpp"
 
 
@@ -32,7 +32,6 @@ int main(int argc, char** argv) {
 
 	VRenderer& renderer = VRenderer::Instance();
 	renderer.SetupPipeline<DefaultPipeline>();
-	//renderer.EnableRenderer(false);
 
 
 	#pragma region Show up GUI views

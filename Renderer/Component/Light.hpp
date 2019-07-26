@@ -117,7 +117,7 @@ namespace VRender {
 							light.a = make_float3(mat * make_float4(-0.5, 0, -0.5, 1));
 							light.b = make_float3(mat * make_float4(1, 0, 0, 0));
 							light.c = make_float3(mat * make_float4(0, 0, 1, 0));
-							light.d = make_float3(mat * make_float4(0, 1, 0, 0));
+							light.d = normalize(make_float3(mat * make_float4(0, 1, 0, 0)));
 						default:
 							break;
 						}

@@ -136,7 +136,6 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 		}
 	}
 	
-	
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
 
@@ -167,7 +166,7 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 				// convert area based pdf to solid angle
 				const float weight = LnDl * A / (M_PIf * Ldist * Ldist);
 				float3 light_satu = light.emission * weight * shadow_prd.inShadow;
-				current_prd.radiance += ((PBS<2>(IN, L, light_satu, -ray.direction) + nDl * LnDl * light_satu * baseColor));
+				current_prd.radiance += PBS<2>(IN, L, light_satu, -ray.direction);
 			}
 		}
 	}

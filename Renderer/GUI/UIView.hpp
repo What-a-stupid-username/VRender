@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "renderView.hpp"
+#include "RenderView.hpp"
 
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -361,7 +361,15 @@ private:
 			   
 		auto objects = VRender::VObjectManager::GetAllObjects();
 		
-		if (ImGui::IsMouseHoveringWindow() && ImGui::IsMouseReleased(0)) {
+		static bool clicked_here = false;
+		if (ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(0)) {
+			clicked_here = true;
+		}
+		else if (!ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(0)) {
+			clicked_here = false;
+		}
+
+		if (clicked_here && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseReleased(0)) {
 			selected_obj = -1;
 		}
 

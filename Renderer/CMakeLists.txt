@@ -52,7 +52,7 @@ add_sample_executable(Renderer
 	VRender/Scene.cpp
 	
 	GUI/resource.rc
-	GUI/renderView.hpp
+	GUI/RenderView.hpp
 	GUI/UIView.hpp
 )
 
