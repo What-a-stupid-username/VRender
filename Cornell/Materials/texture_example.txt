@@ -1,0 +1,4 @@
+string:Texture|baseColorTex:baseColor.sRGB.bmp
+string:Texture|metallicTex:metallic.bmp
+string:Texture|normalTex:normal.bmp
+string:Texture|roughnessTex:roughness.bmp

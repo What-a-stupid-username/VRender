@@ -4,6 +4,7 @@
 #include "path_tracer.cuh"
 
 
+rtDeclareVariable(unsigned int, camera_staticFrameNum, , );
 
 //-----------------------------------------------------------------------------
 //
@@ -39,9 +40,9 @@ RT_PROGRAM void default_lit_ClosestHit() //ray-type = 0(common_ray)
 
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
 
-	current_prd.seed += 197;
+	current_prd.seed = tea<16>(current_prd.seed, camera_staticFrameNum);
 	float z1 = rnd(current_prd.seed);
-	current_prd.seed += 197;
+	current_prd.seed = tea<16>(current_prd.seed, camera_staticFrameNum);
 	float z2 = rnd(current_prd.seed);
 	float3 baseColor;
 

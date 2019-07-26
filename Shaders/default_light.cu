@@ -20,8 +20,9 @@ RT_PROGRAM void default_light_ClosestHit() //ray-type = 0(normal_ray)
 	float3 normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));
 	if (current_prd.depth == 0) current_prd.id = object_id;
 	float3 emission_color = lights[light_id].emission;
-	if (dot(ray.direction, normal) < 0)
-		current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
+	float k = dot(-ray.direction, normal);
+	if (k  > 0)
+		current_prd.radiance = current_prd.countEmitted ? emission_color * k : make_float3(0.f);
 }
 
 RT_PROGRAM void default_light_AnyHit() //ray-type = 1(shaodw_ray)

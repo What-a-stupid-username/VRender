@@ -6,5 +6,5 @@ Object:Ceiling|Quad.obj|(0, 5, 0)(180, 0, 0)(10, 10, 10)
 Object:Back wall|Quad.obj|(0, 0, 5)(-90, 0, 0)(10, 10, 10)
 Object:Right wall|Quad.obj|(-5,0,0)(0, 0, -90)(10, 10, 10)|blue
 Object:Left wall|Quad.obj|(5, 0, 0)(0, 0, 90)(10, 10, 10)|red
-Light:Light|0|(0, 4.99, 0)(180, 0, 0)(2, 2, 2)(15, 15, 15)|light
+Light:Light|0|(0, 4.99, 0)(180, 0, 0)(2, 2, 2)(30, 30, 30)|light
 Camera:(0, 0, -11)(0, 0, 1)(0, 1, 0)(35, 35)

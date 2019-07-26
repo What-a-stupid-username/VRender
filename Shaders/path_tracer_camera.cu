@@ -36,15 +36,15 @@ RT_PROGRAM void dispatch()
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
     float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
 
-	unsigned int seed = tea<16>(screen.x*launch_index.y + launch_index.x + rnd_seed, camera_staticFrameNum);
-	float z = rnd(seed);
-
 	int actrual_sqrt_sample_num = sqrt_num_samples;
 
     float2 jitter_scale = inv_screen / actrual_sqrt_sample_num;
     unsigned int samples_per_pixel = actrual_sqrt_sample_num*actrual_sqrt_sample_num;
 	unsigned int samples_index = samples_per_pixel;
 
+	unsigned int pixel_id = (screen.x * launch_index.y + launch_index.x) * (samples_per_pixel + 1);
+	unsigned int seed = tea<16>(pixel_id, camera_staticFrameNum);
+	float z = rnd(seed);
 	float3 color_result = make_float3(0.0f);
 	int id = -1;
     do 
@@ -54,7 +54,7 @@ RT_PROGRAM void dispatch()
         //
         unsigned int x = samples_index % actrual_sqrt_sample_num;
         unsigned int y = samples_index / actrual_sqrt_sample_num;
-        float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
+        float2 jitter = make_float2(x - z, y - z);
         float2 d = pixel + jitter*jitter_scale;
 		
 		float3 ray_origin = camera_position;
@@ -63,7 +63,7 @@ RT_PROGRAM void dispatch()
         // Initialze per-ray data
         PerRayData_pathtrace prd;
         prd.countEmitted = true;
-        prd.seed = seed;
+        prd.seed = tea<16>(pixel_id + samples_index, camera_staticFrameNum);
 		prd.depth = 0;
 		prd.id = -1;
 		prd.radiance = make_float3(0);
