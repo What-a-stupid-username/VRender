@@ -2063,6 +2063,17 @@ namespace tinyobj {
 
 			line_num++;
 
+			//Add support of '\\'
+			if (linebuf != "") {
+				while (linebuf.back() == '\\')
+				{
+					string b = linebuf.substr(0, linebuf.length() - 1);
+					safeGetline(*inStream, linebuf);
+					line_num++;
+					linebuf = b + linebuf;
+				}
+			}
+
 			// Trim newline '\r\n' or '\n'
 			if (linebuf.size() > 0) {
 				if (linebuf[linebuf.size() - 1] == '\n')
